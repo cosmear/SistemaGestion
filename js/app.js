@@ -8,12 +8,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const headerTitle = document.getElementById('header-title');
 
     const viewTitles = {
-        'dashboard': 'Dashboard',
+        'dashboard': 'Panel de Control',
         'clients': 'Gestión de Clientes',
-        'cashflow': 'Cashflow Histórico',
-        'budget': 'Presupuesto',
-        'tasks': 'Tableros de Tareas',
-        'audit': 'Historial de Movimientos'
+        'cashflow': 'Caja y Flujo de Fondos',
+        'budget': 'Presupuesto Anual',
+        'tasks': 'Gestión de Tareas',
+        'calendar': 'Agenda Compartida',
+        'audit': 'Registro de Auditoría'
     };
 
     function switchView(viewId) {
@@ -44,12 +45,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Trigger view-specific render logic
-        if (viewId === 'dashboard' && window.Dashboard) Dashboard.render();
-        if (viewId === 'clients' && window.ClientsApp) ClientsApp.render();
-        if (viewId === 'cashflow' && window.CashflowApp) CashflowApp.render();
-        if (viewId === 'budget' && window.BudgetApp) BudgetApp.render();
-        if (viewId === 'tasks' && window.TasksApp) TasksApp.render();
-        if (viewId === 'audit' && window.AuditApp) AuditApp.render();
+        if(viewId === 'dashboard' && window.DashboardApp) window.DashboardApp.render();
+        if(viewId === 'clients' && window.ClientsApp) window.ClientsApp.render();
+        if(viewId === 'cashflow' && window.CashflowApp) window.CashflowApp.render();
+        if(viewId === 'budget' && window.BudgetApp) window.BudgetApp.render();
+        if(viewId === 'tasks' && window.TasksApp) window.TasksApp.render();
+        if(viewId === 'calendar' && window.CalendarApp) {
+             // Calendar size rendering bug fix
+             setTimeout(() => window.CalendarApp.render(), 50);
+        }
+        if(viewId === 'audit' && window.AuditApp) window.AuditApp.render();
     }
 
     navButtons.forEach(btn => {

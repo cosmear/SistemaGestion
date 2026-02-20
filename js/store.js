@@ -47,9 +47,16 @@ const Store = {
         // Ensure arrays exist
         if (!this.data.clients) this.data.clients = [];
         if (!this.data.cashflow) this.data.cashflow = [];
-        if (!this.data.budget) this.data.budget = { incomes: [], expenses: [] };
         if (!this.data.auditLog) this.data.auditLog = [];
         if (!this.data.boards) this.data.boards = {};
+        
+        // Deep ensure for budget structure
+        if (!this.data.budget || Array.isArray(this.data.budget)) {
+            this.data.budget = { incomes: [], expenses: [] };
+        } else {
+            if (!this.data.budget.incomes) this.data.budget.incomes = [];
+            if (!this.data.budget.expenses) this.data.budget.expenses = [];
+        }
     },
 
     save() {
