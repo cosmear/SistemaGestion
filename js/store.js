@@ -30,18 +30,29 @@ const initialData = {
 const Store = {
     data: null,
 
-    init() {
-        const stored = localStorage.getItem(STORE_KEY);
-        if (stored) {
-            try {
-                this.data = JSON.parse(stored);
-            } catch (e) {
-                console.error("Error parsing stored data", e);
+    async init() {
+        try {
+            // Append timestamp to prevent aggressive caching
+            const response = await fetch('data.json?t=' + Date.now());
+            if (response.ok) {
+                this.data = await response.json();
+            } else {
+                // If it doesn't exist yet, fallback and try to create it
+                this.data = JSON.parse(JSON.stringify(initialData));
+                this.save();
+            }
+        } catch (e) {
+            console.error("Error fetching data.json, falling back to local storage", e);
+            const stored = localStorage.getItem(STORE_KEY);
+            if (stored) {
+                try {
+                    this.data = JSON.parse(stored);
+                } catch (err) {
+                    this.data = JSON.parse(JSON.stringify(initialData));
+                }
+            } else {
                 this.data = JSON.parse(JSON.stringify(initialData));
             }
-        } else {
-            this.data = JSON.parse(JSON.stringify(initialData));
-            this.save();
         }
         
         // Ensure arrays exist
@@ -59,8 +70,22 @@ const Store = {
         }
     },
 
-    save() {
+    async save() {
+        // Local backup fallback
         localStorage.setItem(STORE_KEY, JSON.stringify(this.data));
+        
+        // Save to remote JSON file via PHP
+        try {
+            await fetch('save.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(this.data)
+            });
+        } catch(e) {
+            console.error('Error saving data to server', e);
+        }
     },
 
     // --- Audit Log ---
@@ -323,5 +348,5 @@ const Store = {
     }
 };
 
-// Initialize store on script load
-Store.init();
+// Initialize store on script load and expose the promise
+Store.initPromise = Store.init();

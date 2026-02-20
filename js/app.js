@@ -1,7 +1,12 @@
 // app.js - Main application logic (Navigation, Modals)
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     
+    // Wait for the store to initialize (fetch from server)
+    if (Store.initPromise) {
+        await Store.initPromise;
+    }
+
     // --- Navigation ---
     const navButtons = document.querySelectorAll('.nav-btn');
     const viewSections = document.querySelectorAll('.view-section');
