@@ -34,6 +34,36 @@
     transform: scale(1) !important;
 }
 
+/* Base FullCalendar Overrides for better integration with Tailwind */
+.fc .fc-toolbar-title {
+  font-size: 1.25rem !important;
+  font-weight: 700 !important;
+  color: #111827;
+}
+
+.fc .fc-button-primary {
+  background-color: #4F46E5 !important;
+  border-color: #4F46E5 !important;
+  text-transform: capitalize;
+}
+
+.fc .fc-button-primary:hover {
+  background-color: #4338CA !important;
+}
+
+.fc-theme-standard td, .fc-theme-standard th {
+  border-color: #e5e7eb !important;
+}
+
+.fc .fc-daygrid-day.fc-day-today {
+  background-color: #EEF2FF !important;
+}
+
+.fc-event {
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
 /* Pack Bages Colors */
 .pack-badge-0 { background-color: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; } /* Slate */
 .pack-badge-1 { background-color: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; } /* Blue */

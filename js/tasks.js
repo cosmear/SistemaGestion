@@ -43,13 +43,50 @@ window.TasksApp = {
         }
     },
 
+    switchTab(tab) {
+        const btnBoards = document.getElementById('tab-btn-boards');
+        const btnCalendar = document.getElementById('tab-btn-calendar');
+        const viewBoards = document.getElementById('view-tasks-boards');
+        const viewCalendar = document.getElementById('view-tasks-calendar');
+
+        if (tab === 'boards') {
+            btnBoards.className = 'px-6 py-3 border-b-2 text-sm font-semibold transition-colors border-brand-600 text-brand-600';
+            btnCalendar.className = 'px-6 py-3 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors';
+            viewBoards.classList.remove('hidden');
+            viewCalendar.classList.add('hidden');
+            this.render();
+        } else if (tab === 'calendar') {
+            btnCalendar.className = 'px-6 py-3 border-b-2 text-sm font-semibold transition-colors border-brand-600 text-brand-600';
+            btnBoards.className = 'px-6 py-3 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors';
+            viewCalendar.classList.remove('hidden');
+            viewBoards.classList.add('hidden');
+            
+            // FullCalendar needs the container to be visible to calculate sizes correctly
+            setTimeout(() => {
+                this.renderCalendar();
+            }, 50);
+        }
+    },
+
     renderSelector(container) {
+        const currentUser = (window.Auth && window.Auth.getUser()) ? window.Auth.getUser() : 'Usuario';
+        const personalBoardId = 'personal_' + currentUser;
+
         let html = `
             <div class="mb-6">
                 <h3 class="text-xl font-bold text-gray-900 mb-2">Selecciona un Tablero</h3>
                 <p class="text-gray-500 text-sm mb-6">Elige el tablero de LoopSmith o de un cliente activo para gestionar sus tareas.</p>
                 
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    
+                    <!-- Personal Board Card -->
+                    <div onclick="TasksApp.selectBoard('${personalBoardId}')" class="bg-gradient-to-br from-indigo-500 to-indigo-700 p-6 rounded-2xl shadow-md cursor-pointer hover:-translate-y-1 hover:shadow-lg transition-all text-white relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 opacity-10 scale-150 group-hover:scale-125 transition-transform"><i class="ph-fill ph-user text-8xl"></i></div>
+                        <i class="ph ph-user-circle text-3xl mb-3"></i>
+                        <h4 class="text-lg font-bold">Mi Pizarrón</h4>
+                        <p class="text-indigo-100 text-sm mt-1">Privado - ${escapeHtml(currentUser)}</p>
+                    </div>
+
                     <!-- LoopSmith Card -->
                     <div onclick="TasksApp.selectBoard('LoopSmith')" class="bg-gradient-to-br from-brand-500 to-brand-700 p-6 rounded-2xl shadow-md cursor-pointer hover:-translate-y-1 hover:shadow-lg transition-all text-white relative overflow-hidden group">
                         <div class="absolute -right-4 -top-4 opacity-10 scale-150 group-hover:scale-125 transition-transform"><i class="ph-fill ph-infinity text-8xl"></i></div>
@@ -87,6 +124,8 @@ window.TasksApp = {
             const cId = this.currentBoardId.split('_')[1];
             const client = Store.getClients(true).find(c => c.id === cId);
             if(client) boardName = client.name;
+        } else if (this.currentBoardId.startsWith('personal_')) {
+            boardName = 'Mi Pizarrón Personal';
         }
 
         container.innerHTML = `
@@ -440,6 +479,104 @@ window.TasksApp = {
         
         this.showEditTaskModal('dummy', taskId);
         this.renderBoard();
+    },
+
+    // --- Calendar Integration ---
+    renderCalendar() {
+        const calContainer = document.getElementById('calendar-container');
+        if (!calContainer) return;
+        
+        // Wait for FullCalendar to be available
+        if (typeof FullCalendar === 'undefined') {
+            console.warn("FullCalendar cdn not loaded yet");
+            setTimeout(() => this.renderCalendar(), 100);
+            return;
+        }
+
+        calContainer.innerHTML = ''; // clear previous instance
+        
+        let events = [];
+        const currentUser = (window.Auth && window.Auth.getUser()) ? window.Auth.getUser() : 'Usuario';
+        
+        // Aggregate all tasks with deadlines across all boards
+        Object.keys(Store.data.boards).forEach(bId => {
+            // Only aggregate if it's public (LoopSmith/client_) or it's MY personal board
+            if (bId.startsWith('personal_') && bId !== ('personal_' + currentUser)) return;
+
+            const board = Store.data.boards[bId];
+            if(!board.tasks) return;
+            
+            Object.values(board.tasks).forEach(task => {
+                if(task.deadline) {
+                    let color = '#4F46E5'; // brand-600 default
+                    if (task.priority === 'high') color = '#DC2626'; // red-600
+                    if (task.priority === 'medium') color = '#D97706'; // amber-600
+                    
+                    let boardNameStr = 'LoopSmith';
+                    if (bId.startsWith('client_')) {
+                         const cid = bId.split('_')[1];
+                         const cli = Store.data.clients.find(c => c.id === cid);
+                         boardNameStr = cli ? cli.name : 'Cliente';
+                    } else if (bId.startsWith('personal_')) {
+                         boardNameStr = 'Mi Pizarrón';
+                    }
+
+                    // To figure out which column this belongs to (for removing/editing edge cases),
+                    // we ideally want to pass the colId. 
+                    let colId = 'dummy';
+                    board.columns.forEach(c => {
+                        if (c.taskIds.includes(task.id)) colId = c.id;
+                    });
+
+                    events.push({
+                        id: task.id,
+                        title: `[${boardNameStr}] ${task.title}`,
+                        start: task.deadline,
+                        allDay: true,
+                        backgroundColor: color,
+                        borderColor: color,
+                        extendedProps: {
+                            boardId: bId,
+                            colId: colId,
+                            rawTitle: task.title
+                        }
+                    });
+                }
+            });
+        });
+
+        const calendar = new FullCalendar.Calendar(calContainer, {
+            initialView: 'dayGridMonth',
+            locale: 'es',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek'
+            },
+            events: events,
+            eventClick: (info) => {
+                const props = info.event.extendedProps;
+                
+                // Temporarily switch board context to edit task safely
+                const previousBoardId = this.currentBoardId;
+                this.currentBoardId = props.boardId;
+                
+                // We show modal, and when the user finishes, we have to reload the calendar to reflect changes natively.
+                // It's a bit hacky, but tasks.js is designed mostly for board view.
+                
+                this.showEditTaskModal(props.colId, info.event.id);
+                
+                // We override the renderBoard temporally so edits refresh the calendar instead if we are in calendar tab
+                const originalRenderBoard = this.renderBoard;
+                this.renderBoard = () => {
+                   this.renderCalendar(); 
+                   this.currentBoardId = previousBoardId; // restore
+                   this.renderBoard = originalRenderBoard; // detach override
+                };
+            }
+        });
+        
+        calendar.render();
     }
 };
 

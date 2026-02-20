@@ -15,6 +15,8 @@
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <!-- SortableJS (Drag and Drop) -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <!-- FullCalendar JS for the Calendar module -->
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
 
     <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css" />
@@ -313,11 +315,31 @@
           </div>
         </div>
 
-        <!-- Tasks (Trello) View -->
+        <!-- Tasks (Trello & Calendar) View -->
         <div id="view-tasks" class="view-section hidden animate-fade-in h-full flex flex-col">
-          <div id="view-tasks-content" class="h-full flex flex-col">
-              <!-- Handled by TasksApp.render() -->
+          
+          <!-- View Tabs (Boards vs Calendar) -->
+          <div class="flex border-b border-gray-200 mb-6 mt-2 shrink-0">
+            <button id="tab-btn-boards" onclick="TasksApp.switchTab('boards')" class="px-6 py-3 border-b-2 text-sm font-semibold transition-colors border-brand-600 text-brand-600">
+              <i class="ph ph-kanban mr-2"></i>Tableros
+            </button>
+            <button id="tab-btn-calendar" onclick="TasksApp.switchTab('calendar')" class="px-6 py-3 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors">
+              <i class="ph ph-calendar-blank mr-2"></i>Calendario
+            </button>
           </div>
+
+          <!-- Boards Content Area -->
+          <div id="view-tasks-boards" class="h-full flex flex-col">
+              <div id="view-tasks-content" class="h-full flex flex-col">
+                  <!-- Handled by TasksApp.render() -->
+              </div>
+          </div>
+
+          <!-- Calendar Content Area -->
+          <div id="view-tasks-calendar" class="hidden h-full flex flex-col bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+              <div id="calendar-container" class="flex-1 w-full min-h-[600px]"></div>
+          </div>
+
         </div>
 
       </div>
