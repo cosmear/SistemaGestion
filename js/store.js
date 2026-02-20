@@ -32,17 +32,21 @@ const Store = {
 
     async init() {
         try {
+            // Check if we are running locally via file:// protocol
+            if (window.location.protocol === 'file:') {
+                throw new Error("Cannot fetch data.json via file:// protocol. Falling back to localStorage.");
+            }
+
             // Append timestamp to prevent aggressive caching
             const response = await fetch('data.json?t=' + Date.now());
             if (response.ok) {
                 this.data = await response.json();
             } else {
                 // If it doesn't exist yet, fallback and try to create it
-                this.data = JSON.parse(JSON.stringify(initialData));
-                this.save();
+                throw new Error("data.json not found on server.");
             }
         } catch (e) {
-            console.error("Error fetching data.json, falling back to local storage", e);
+            console.warn(e.message);
             const stored = localStorage.getItem(STORE_KEY);
             if (stored) {
                 try {
@@ -53,6 +57,8 @@ const Store = {
             } else {
                 this.data = JSON.parse(JSON.stringify(initialData));
             }
+            // Attempt to save to trigger localstorage backup
+            this.save();
         }
         
         // Ensure arrays exist
@@ -74,17 +80,19 @@ const Store = {
         // Local backup fallback
         localStorage.setItem(STORE_KEY, JSON.stringify(this.data));
         
-        // Save to remote JSON file via PHP
-        try {
-            await fetch('save.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(this.data)
-            });
-        } catch(e) {
-            console.error('Error saving data to server', e);
+        // Save to remote JSON file via PHP (only if not local file://)
+        if (window.location.protocol !== 'file:') {
+            try {
+                await fetch('save.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(this.data)
+                });
+            } catch(e) {
+                console.error('Error saving data to server', e);
+            }
         }
     },
 
