@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Loop Smith Management</title>
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- SortableJS (Drag and Drop) -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css" />
+
+    <!-- Tailwind Config -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Inter", "sans-serif"],
+            },
+            colors: {
+              brand: {
+                50: "#f0fdf4",
+                100: "#dcfce7",
+                500: "#22c55e",
+                600: "#16a34a",
+                700: "#15803d",
+                900: "#14532d",
+              },
+            },
+          },
+        },
+      };
+    </script>
+  </head>
+  <body
+    class="bg-gray-50 text-gray-900 font-sans h-screen overflow-hidden flex"
+  >
+    <!-- Sidebar -->
+    <aside
+      class="w-64 bg-white border-r border-gray-200 flex flex-col h-full shadow-sm z-10 transition-all duration-300 relative"
+    >
+      <div class="p-6 flex items-center gap-3 border-b border-gray-100">
+        <div
+          class="w-8 h-8 rounded-lg bg-brand-500 text-white flex items-center justify-center font-bold text-xl shadow-md"
+        >
+          L
+        </div>
+        <h1 class="text-xl font-bold tracking-tight text-gray-900">
+          Loop Smith
+        </h1>
+      </div>
+
+      <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+        <a
+          href="#"
+          data-view="dashboard"
+          class="nav-btn flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-brand-50 text-brand-700"
+        >
+          <i class="ph ph-squares-four text-lg"></i>
+          Dashboard
+        </a>
+        <a
+          href="#"
+          data-view="clients"
+          class="nav-btn flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+        >
+          <i class="ph ph-users text-lg"></i>
+          Clientes
+        </a>
+        <a
+          href="#"
+          data-view="cashflow"
+          class="nav-btn flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+        >
+          <i class="ph ph-list-dashes text-lg"></i>
+          Cashflow
+        </a>
+        <a
+          href="#"
+          data-view="budget"
+          class="nav-btn flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+        >
+          <i class="ph ph-chart-line-up text-lg"></i>
+          Presupuesto
+        </a>
+        <a
+          href="#"
+          data-view="tasks"
+          class="nav-btn flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+        >
+          <i class="ph ph-kanban text-lg"></i>
+          Tareas
+        </a>
+        <a
+          href="#"
+          data-view="audit"
+          class="nav-btn flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+        >
+          <i class="ph ph-clock-counter-clockwise text-lg"></i>
+          Historial
+        </a>
+      </nav>
+
+      <div class="p-4 border-t border-gray-100">
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-3 px-2">
+            <div
+              class="w-8 h-8 rounded-full bg-brand-100 text-brand-700 font-bold overflow-hidden shadow-inner flex items-center justify-center"
+              id="sidebar-user-avatar"
+            >
+              U
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-900" id="sidebar-user-name">Usuario</p>
+              <p class="text-xs text-gray-500">Administrador</p>
+            </div>
+          </div>
+          <button id="btn-logout" class="text-xs text-gray-500 hover:text-red-600 text-left px-2 flex items-center gap-2 transition-colors">
+            <i class="ph ph-sign-out"></i> Cerrar Sesión
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-full bg-gray-50 overflow-hidden">
+      <!-- Header -->
+      <header
+        class="h-16 bg-white/80 backdrop-blur-md border-b border-gray-200 flex items-center justify-between px-8 sticky top-0 z-20"
+      >
+        <h2 id="header-title" class="text-xl font-semibold text-gray-800">
+          Dashboard
+        </h2>
+        <div class="flex items-center gap-4">
+          <button
+            class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Notificaciones"
+          >
+            <i class="ph ph-bell text-xl"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- View Area -->
+      <div id="view-area" class="flex-1 overflow-y-auto p-8 relative">
+        <!-- Views will be injected here or toggled -->
+
+        <!-- Dashboard View -->
+        <div
+          id="view-dashboard"
+          class="view-section active animate-fade-in block"
+        >
+          <div
+            class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
+            id="dashboard-stats-container"
+          >
+            <!-- Stats injected by JS -->
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Recent activity or charts can go here -->
+            <div
+              class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"
+            >
+              <h3 class="text-lg font-semibold mb-4">Actividad Reciente</h3>
+              <div id="recent-activity-container" class="space-y-4">
+                <p class="text-sm text-gray-500 text-center py-4">
+                  No hay actividad reciente.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Clients View -->
+        <div id="view-clients" class="view-section hidden animate-fade-in">
+          <div class="flex justify-between items-center mb-6">
+            <h3 class="text-lg font-semibold">Lista de Clientes</h3>
+            <button
+              id="btn-add-client"
+              class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
+            >
+              <i class="ph ph-plus"></i> Nuevo Cliente
+            </button>
+          </div>
+          <div
+            class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+          >
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr
+                  class="bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  <th class="py-3 px-6">Cliente</th>
+                  <th class="py-3 px-6">Pack</th>
+                  <th class="py-3 px-6">Estado</th>
+                  <th class="py-3 px-6 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="clients-table-body" class="divide-y divide-gray-100">
+                <!-- Clients injected by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Cashflow View -->
+        <div id="view-cashflow" class="view-section hidden animate-fade-in">
+          <div class="flex justify-between items-center mb-6">
+            <h3 class="text-lg font-semibold">Transacciones</h3>
+            <div class="flex gap-2">
+              <button
+                id="btn-add-income"
+                class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
+              >
+                <i class="ph ph-arrow-down-left"></i> Ingreso
+              </button>
+              <button
+                id="btn-add-expense"
+                class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
+              >
+                <i class="ph ph-arrow-up-right"></i> Salida
+              </button>
+            </div>
+          </div>
+
+          <div
+            class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mb-6 flex justify-between items-center"
+          >
+            <div>
+              <p class="text-sm text-gray-500 font-medium">Balance Total</p>
+              <h4
+                id="cashflow-total-balance"
+                class="text-3xl font-bold mt-1 text-gray-900"
+              >
+                $0.00
+              </h4>
+            </div>
+            <div class="flex gap-6">
+              <div>
+                <p class="text-sm text-gray-500 font-medium">
+                  Ingresos Totales
+                </p>
+                <p
+                  id="cashflow-total-in"
+                  class="text-xl font-semibold text-green-600"
+                >
+                  $0.00
+                </p>
+              </div>
+              <div>
+                <p class="text-sm text-gray-500 font-medium">Salidas Totales</p>
+                <p
+                  id="cashflow-total-out"
+                  class="text-xl font-semibold text-red-600"
+                >
+                  $0.00
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+          >
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr
+                  class="bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  <th class="py-3 px-6">Fecha</th>
+                  <th class="py-3 px-6">Descripción</th>
+                  <th class="py-3 px-6">De/Hacia</th>
+                  <th class="py-3 px-6 text-right">Monto</th>
+                  <th class="py-3 px-6 text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="cashflow-table-body" class="divide-y divide-gray-100">
+                <!-- Transactions injected by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Audit Log View -->
+        <div id="view-audit" class="view-section hidden animate-fade-in">
+          <div class="flex items-center gap-4 mb-6">
+            <h3 class="text-lg font-semibold flex-1">Historial de Movimientos</h3>
+          </div>
+          <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-500 uppercase tracking-wider">
+                  <th class="py-3 px-6 w-48">Fecha y Hora</th>
+                  <th class="py-3 px-6 w-32">Usuario</th>
+                  <th class="py-3 px-6">Acción Realizada</th>
+                </tr>
+              </thead>
+              <tbody id="audit-table-body" class="divide-y divide-gray-100 text-sm">
+                <!-- Audit logs injected by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tasks (Trello) View -->
+        <div id="view-tasks" class="view-section hidden animate-fade-in h-full flex flex-col">
+          <div id="view-tasks-content" class="h-full flex flex-col">
+              <!-- Handled by TasksApp.render() -->
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Login Overlay -->
+    <div id="login-overlay" class="fixed inset-0 bg-gray-900 z-[100] flex items-center justify-center transition-opacity duration-500">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm animate-fade-in">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 mx-auto bg-brand-500 text-white rounded-xl flex items-center justify-center text-3xl font-bold mb-4 shadow-lg shrink-0">L</div>
+                <h2 class="text-2xl font-bold text-gray-900">Loop Smith</h2>
+                <p class="text-sm text-gray-500 mt-1">Ingresa para continuar</p>
+            </div>
+            
+            <form id="form-login" class="space-y-5">
+                <div id="login-error" class="hidden bg-red-50 text-red-600 text-sm p-3 rounded-lg text-center font-medium">
+                    Usuario o contraseña incorrectos.
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
+                    <input type="text" id="login-user" required class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-shadow">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+                    <input type="password" id="login-pass" required class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-shadow">
+                </div>
+                <button type="submit" class="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg font-medium transition-colors shadow-md mt-2">
+                    Ingresar
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modals Container (handled via JS) -->
+    <div
+      id="modal-container"
+      class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300"
+    >
+      <!-- Dynamic modal content goes here -->
+      <div
+        id="modal-content"
+        class="bg-white rounded-2xl w-full max-w-md shadow-2xl transform scale-95 transition-transform duration-300 overflow-hidden"
+      >
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/store.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/clients.js"></script>
+    <script src="js/cashflow.js"></script>
+    <script src="js/budget.js"></script>
+    <script src="js/audit.js"></script>
+    <script src="js/tasks.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
