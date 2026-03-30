@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { SquaresFour, Users, ListDashes, ChartLineUp, Kanban, CalendarBlank, ClockCounterClockwise, SignOut } from '@phosphor-icons/react';
+import { SquaresFour, Users, ListDashes, ChartLineUp, Kanban, CalendarBlank, ClockCounterClockwise, SignOut, Ticket } from '@phosphor-icons/react';
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -13,6 +13,7 @@ export default function Sidebar() {
     { href: '/budget', icon: ChartLineUp, label: 'Presupuesto' },
     { href: '/tasks', icon: Kanban, label: 'Tareas' },
     { href: '/calendar', icon: CalendarBlank, label: 'Calendario' },
+    { href: '/tickets', icon: Ticket, label: 'Casos B2B' },
     { href: '/audit', icon: ClockCounterClockwise, label: 'Historial' },
   ];
 

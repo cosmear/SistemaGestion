@@ -9,17 +9,21 @@
   --color-brand-900: #14532d;
 }
 
+body {
+  background-color: #f8fafc;
+}
+
 /* Smooth scrollbar for webkit */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
-  border-radius: 4px;
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
@@ -40,4 +44,96 @@
 .pack-badge-1 { background-color: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; } /* Blue */
 .pack-badge-2 { background-color: #fef08a; color: #854d0e; border: 1px solid #fde047; } /* Yellow */
 .pack-badge-3 { background-color: #fce7f3; color: #be185d; border: 1px solid #fbcfe8; } /* Pink */
-.pack-badge-custom { background-color: #d1fae5; color: #047857; border: 1px solid #a7f3d0; } /* Emerald */
+.pack-badge-custom { background-color: #d1fae5; color: #047857; border: 1px solid #6ee7b7; box-shadow: 0 0 10px rgba(16, 185, 129, 0.2); } /* Emerald */
+
+/* ------------------------------------- 
+   PREMIUM FULLCALENDAR CUSTOMIZATION 
+------------------------------------- */
+.fc {
+  font-family: inherit;
+  --fc-border-color: #e2e8f0;
+  --fc-button-bg-color: #ffffff;
+  --fc-button-border-color: #d1d5db;
+  --fc-button-text-color: #374151;
+  --fc-button-hover-bg-color: #f3f4f6;
+  --fc-button-hover-border-color: #d1d5db;
+  --fc-button-active-bg-color: #e5e7eb;
+  --fc-button-active-border-color: #d1d5db;
+  --fc-today-bg-color: #f0fdfa; /* Soft teal background for today */
+}
+
+/* Header Navbar */
+.fc .fc-toolbar-title {
+  font-size: 1.5rem !important;
+  font-weight: 800 !important;
+  color: #111827;
+  letter-spacing: -0.025em;
+}
+
+/* Buttons */
+.fc .fc-button {
+  font-weight: 600 !important;
+  text-transform: capitalize;
+  border-radius: 0.5rem !important;
+  padding: 0.5rem 1rem !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease !important;
+}
+.fc .fc-button-primary:not(:disabled):active, 
+.fc .fc-button-primary:not(:disabled).fc-button-active {
+  background-color: #1e293b !important;
+  border-color: #1e293b !important;
+  color: white !important;
+  box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Grid & Cells */
+.fc-theme-standard td, .fc-theme-standard th {
+  border-color: #f1f5f9 !important;
+}
+
+.fc .fc-col-header-cell-cushion {
+  padding: 12px 0 !important;
+  font-weight: 700 !important;
+  color: #64748b;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+.fc .fc-daygrid-day-number {
+  font-weight: 600;
+  color: #475569;
+  padding: 8px !important;
+}
+
+.fc .fc-day-today .fc-daygrid-day-number {
+  color: #0d9488; /* Teal brand */
+  background: #ccfbf1;
+  border-radius: 9999px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 4px;
+}
+
+/* Events */
+.fc-event {
+  cursor: pointer;
+  padding: 3px 6px !important;
+  border-radius: 6px !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  border: none !important;
+  margin: 1px 4px !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.fc-event:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
+  z-index: 10 !important;
+}

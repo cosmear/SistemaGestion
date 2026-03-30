@@ -1,32 +1,53 @@
-export default function DashboardPage() {
-  return (
-    <div className="animate-fade-in">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {/* Placeholder for Stats */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-center">
-          <p className="text-sm font-medium text-gray-500 mb-1">Total Clientes Activos</p>
-          <h3 className="text-3xl font-bold text-gray-900">0</h3>
-        </div>
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-center">
-          <p className="text-sm font-medium text-gray-500 mb-1">Ingresos del Mes</p>
-          <h3 className="text-3xl font-bold text-green-600">$0.00</h3>
-        </div>
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-center">
-          <p className="text-sm font-medium text-gray-500 mb-1">Egresos del Mes</p>
-          <h3 className="text-3xl font-bold text-red-600">$0.00</h3>
-        </div>
-      </div>
+import { createClient } from '@/utils/supabase/server';
+import DashboardClient from './DashboardClient';
+import { cookies } from 'next/headers';
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-          <h3 className="text-lg font-semibold mb-4">Actividad Reciente</h3>
-          <div className="space-y-4">
-            <p className="text-sm text-gray-500 text-center py-4">
-              No hay actividad reciente.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+export default async function DashboardPage() {
+  const supabase = await createClient();
+  const cookieStore = await cookies();
+  const userName = cookieStore.get('session_user')?.value || 'Admin';
+
+  // 1. Fetch Tareas Prioridad Alta (del usuario o de team)
+  const { data: fetchTasks } = await supabase
+    .from('kanban_tasks')
+    .select('id, title, deadline, kanban_columns!inner(board_id, title)')
+    .eq('priority', 'high');
+  
+  // Filtramos por privacidad
+  const highPriorityTasks = (fetchTasks || []).filter(t => {
+     const bId = t.kanban_columns?.board_id;
+     if (bId?.startsWith('personal_') && bId !== `personal_${userName}`) return false;
+     return true;
+  });
+
+  // 2. Fetch Tickets Urgentes Abiertos
+  const { data: urgentTickets } = await supabase
+    .from('tickets')
+    .select('id, title, status, classification, created_at, clients(name)')
+    .eq('status', 'open')
+    .in('classification', ['Urgente', 'Bug'])
+    .order('created_at', { ascending: false });
+
+  // 3. Fetch Próximos Eventos del Calendario (A partir de hoy)
+  const today = new Date().toISOString();
+  const { data: upcomingEvents } = await supabase
+    .from('calendar_events')
+    .select('*')
+    .gte('date', today)
+    .order('date', { ascending: true })
+    .limit(5);
+
+  // 4. KPIs
+  const { count: clientsCount } = await supabase.from('clients').select('*', { count: 'exact', head: true }).eq('status', 'active');
+  const { count: ticketsCount } = await supabase.from('tickets').select('*', { count: 'exact', head: true }).eq('status', 'open');
+
+  return (
+    <DashboardClient 
+       userName={userName}
+       tasks={highPriorityTasks || []}
+       tickets={urgentTickets || []}
+       events={upcomingEvents || []}
+       kpis={{ clients: clientsCount || 0, openTickets: ticketsCount || 0 }}
+    />
   );
 }

@@ -51,11 +51,13 @@ export async function deleteTransaction(id, description) {
 export async function insertClient(data) {
   const supabase = await createClient()
   const payload = {
-    name: data.get('name'),
-    pack_type: data.get('pack_type') || '1', // '0', '1', '2' or 'custom'
-    pack_dev_fee: parseFloat(data.get('pack_dev_fee') || 0),
-    pack_monthly_fee: parseFloat(data.get('pack_monthly_fee') || 0),
-    status: data.get('status') || 'active'
+    name: data.name,
+    pack_type: data.pack_type || '1',
+    pack_dev_fee: data.pack_dev_fee || 0,
+    pack_monthly_fee: data.pack_monthly_fee || 0,
+    website_url: data.website_url,
+    phone_whatsapp: data.phone_whatsapp,
+    status: data.status || 'active'
   }
 
   const { data: newClient, error } = await supabase.from('clients').insert([payload]).select().single()
@@ -101,6 +103,49 @@ export async function updateClientStatus(id, newStatus, clientName) {
   
   revalidatePath('/clients')
   return { success: !error }
+}
+
+export async function setClientCredentials(clientId, email, password) {
+  const supabase = await createClient()
+  
+  // Upsert on email conflict or just delete/insert since client_id could be the unique factor structurally
+  // Let's delete existing first to prevent duplicate emails silently
+  await supabase.from('client_users').delete().eq('client_id', clientId);
+  
+  const { error } = await supabase.from('client_users').insert([{
+     client_id: clientId,
+     email: email.trim(),
+     password: password.trim()
+  }]);
+  
+  if (!error) await logAudit(`Modificó credenciales corporativas para cliente ID: ${clientId}`);
+  revalidatePath('/clients');
+  return { success: !error };
+}
+
+export async function deleteClientCredential(clientId) {
+  const supabase = await createClient()
+  const { error } = await supabase.from('client_users').delete().eq('client_id', clientId)
+  
+  if (!error) await logAudit(`Revocó acceso B2B al cliente ID: ${clientId}`);
+  revalidatePath('/clients');
+  return { success: !error };
+}
+
+// --- TICKETS ACTIONS ---
+export async function updateTicketStatus(ticketId, newStatus) {
+  const supabase = await createClient();
+  const { error } = await supabase.from('tickets').update({ status: newStatus }).eq('id', ticketId);
+  revalidatePath('/tickets');
+  return { success: !error };
+}
+
+export async function updateTicketClassification(ticketId, classificationStr) {
+  const supabase = await createClient();
+  const { error } = await supabase.from('tickets').update({ classification: classificationStr }).eq('id', ticketId);
+  if(!error) await logAudit(`Clasificó un ticket de Soporte como "${classificationStr}"`);
+  revalidatePath('/tickets');
+  return { success: !error };
 }
 
 // --- BUDGET ACTIONS ---
@@ -157,4 +202,28 @@ export async function deleteKanbanTask(taskId, title) {
   revalidatePath('/tasks')
   revalidatePath('/calendar')
   return { success: !error }
+}
+
+// --- CALENDAR EVENTS ACTIONS ---
+export async function addCalendarEvent(title, dateStr, type = 'meeting') {
+  const supabase = await createClient();
+  const { error } = await supabase.from('calendar_events').insert([{
+    title,
+    date: dateStr,
+    type
+  }]);
+  
+  if(!error) await logAudit(`Agendó el evento: "${title}"`);
+  revalidatePath('/calendar');
+  revalidatePath('/'); // For dashboard upcoming events
+  return { success: !error };
+}
+
+export async function deleteCalendarEvent(id, title) {
+  const supabase = await createClient();
+  const { error } = await supabase.from('calendar_events').delete().eq('id', id);
+  if(!error) await logAudit(`Canceló el evento: "${title}"`);
+  revalidatePath('/calendar');
+  revalidatePath('/');
+  return { success: !error };
 }

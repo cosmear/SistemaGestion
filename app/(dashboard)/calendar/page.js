@@ -60,16 +60,40 @@ export default async function CalendarPage() {
     }
 
     return {
-      id: t.id,
+      id: `task_${t.id}`,
       title: `${typeName}${t.title}`,
       start: t.deadline,
       backgroundColor: bgColor,
       borderColor: 'transparent',
       extendedProps: {
-        priority: t.priority
+        priority: t.priority,
+        isTask: true,
+        originalId: t.id
       }
     };
   });
 
-  return <CalendarClient events={events} />;
+  // Hito 9: Traer eventos independientes del calendario
+  const { data: rawEvents, error: evErr } = await supabase
+    .from('calendar_events')
+    .select('*')
+    .order('date', { ascending: true });
+
+  const customEvents = (rawEvents || []).map(e => ({
+     id: `event_${e.id}`,
+     title: `📅 ${e.title}`,
+     start: e.date, // Soporta Date ISO string con o sin hora
+     backgroundColor: '#F97316', // Naranja para Eventos Puros
+     borderColor: 'transparent',
+     extendedProps: {
+        isEvent: true,
+        type: e.type,
+        originalId: e.id,
+        originalTitle: e.title
+     }
+  }));
+
+  const allEvents = [...events, ...customEvents];
+
+  return <CalendarClient events={allEvents} />;
 }
