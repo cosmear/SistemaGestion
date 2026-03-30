@@ -1,10 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+import { getSupabaseConfig } from "./config";
 
 export const createClient = (request) => {
+  const { supabaseUrl, supabaseKey } = getSupabaseConfig();
+
   // Create an unmodified response
   let supabaseResponse = NextResponse.next({
     request: {
