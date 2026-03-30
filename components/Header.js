@@ -1,21 +1,33 @@
 'use client';
 import { usePathname } from 'next/navigation';
-import { Bell, SignOut, User } from '@phosphor-icons/react';
+import { Bell, SignOut } from '@phosphor-icons/react';
 import { logoutUser } from '@/app/auth-actions';
 
-export default function Header({ userName }) {
+export default function Header({ userName, userRole }) {
   const pathname = usePathname();
 
   const getTitle = () => {
-    switch(pathname) {
-      case '/': return 'Dashboard';
-      case '/clients': return 'Lista de Clientes';
-      case '/cashflow': return 'Transacciones (Cashflow)';
-      case '/budget': return 'Presupuesto Financiero';
-      case '/tasks': return 'Gestión de Tareas';
-      case '/calendar': return 'Calendario';
-      case '/audit': return 'Historial de Auditoría';
-      default: return 'Sistema de Gestión';
+    switch (pathname) {
+      case '/':
+        return 'Dashboard';
+      case '/clients':
+        return 'Lista de Clientes';
+      case '/cashflow':
+        return 'Transacciones (Cashflow)';
+      case '/budget':
+        return 'Presupuesto Financiero';
+      case '/tasks':
+        return 'Gestion de Tareas';
+      case '/calendar':
+        return 'Calendario';
+      case '/tickets':
+        return 'Tickets y Soporte';
+      case '/billing':
+        return 'Facturacion y Cobranzas';
+      case '/audit':
+        return 'Historial de Auditoria';
+      default:
+        return 'Sistema de Gestion';
     }
   };
 
@@ -38,13 +50,18 @@ export default function Header({ userName }) {
            <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-bold">
               {userName?.charAt(0).toUpperCase()}
            </div>
-           <span className="text-sm font-medium text-gray-700 hidden sm:block">
-             {userName}
-           </span>
+           <div className="hidden sm:block">
+             <span className="text-sm font-medium text-gray-700 block">
+               {userName}
+             </span>
+             <span className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-400">
+               {userRole || 'admin'}
+             </span>
+           </div>
            <button
              onClick={() => logoutUser()}
              className="ml-2 text-gray-400 hover:text-red-500 transition-colors p-1"
-             title="Cerrar sesión"
+             title="Cerrar sesion"
            >
              <SignOut weight="bold" className="text-xl" />
            </button>

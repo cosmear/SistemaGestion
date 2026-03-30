@@ -1,68 +1,86 @@
 'use server'
 
 import { createClient as createSupabase } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import {
+  authenticateClientUser,
+  createClientSession,
+  destroyClientSession,
+  requireClientSession,
+} from '@/utils/auth/client'
 
 export async function loginClientPortal(formData) {
   const email = formData.get('email')
   const password = formData.get('password')
+  const user = await authenticateClientUser(email, password)
 
-  const supabase = await createSupabase()
-
-  // Buscar en client_users si coincide el email y pass
-  const { data: user, error } = await supabase
-     .from('client_users')
-     .select('id, client_id, clients(name)')
-     .eq('email', email)
-     .eq('password', password)
-     .single()
-
-  if (user && !error) {
-    // Esconder cookie de Auth Cliente (diferente a session_user del admin)
-    const cookieStore = await cookies()
-    cookieStore.set('client_session', JSON.stringify({
-       userId: user.id,
-       clientId: user.client_id,
-       clientName: user.clients.name
-    }), { 
-       httpOnly: true, 
-       path: '/', 
-       maxAge: 60 * 60 * 24 * 7 
-    })
+  if (user) {
+    await createClientSession(user)
     return { success: true }
   }
 
-  return { success: false, error: 'Credenciales inválidas o no autorizadas.' }
+  return { success: false, error: 'Credenciales invalidas o usuario sin acceso.' }
 }
 
 export async function logoutClientPortal() {
-  const cookieStore = await cookies()
-  cookieStore.delete('client_session')
+  await destroyClientSession()
   redirect('/portal-login')
 }
 
 export async function submitClientTicket(title, description) {
-  const cookieStore = await cookies()
-  const sessionStr = cookieStore.get('client_session')?.value
-  
-  if(!sessionStr) return { success: false, error: 'Unauthenticated' };
-  
-  const session = JSON.parse(sessionStr);
-  const supabase = await createSupabase();
+  const session = await requireClientSession()
+  const supabase = await createSupabase()
 
-  const { error } = await supabase.from('tickets').insert([{
-     client_id: session.clientId,
-     title,
-     description,
-     status: 'open'
-  }]);
+  const { error } = await supabase.from('tickets').insert([
+    {
+      client_id: session.clientId,
+      title,
+      description,
+      status: 'new',
+      priority: 'medium',
+      source: 'portal',
+    },
+  ])
 
   revalidatePath('/portal')
-  // We also revalidate tickets for admin inbox implicitly?
-  // Revalidating entire '/tickets' helps when admins look.
   revalidatePath('/tickets')
-  
+
   return { success: !error }
+}
+
+export async function submitClientTicketComment(ticketId, message) {
+  const session = await requireClientSession()
+  const supabase = await createSupabase()
+  const normalizedMessage = String(message || '').trim()
+
+  if (!normalizedMessage) {
+    return { success: false, error: 'Escribe un mensaje antes de enviarlo.' }
+  }
+
+  const { data: ticket, error: ticketError } = await supabase
+    .from('tickets')
+    .select('id')
+    .eq('id', ticketId)
+    .eq('client_id', session.clientId)
+    .maybeSingle()
+
+  if (ticketError || !ticket) {
+    return { success: false, error: ticketError?.message || 'Ticket no encontrado.' }
+  }
+
+  const { error } = await supabase.from('ticket_comments').insert([
+    {
+      ticket_id: ticket.id,
+      author_name: session.clientName,
+      author_role: 'client',
+      visibility: 'public',
+      message: normalizedMessage,
+    },
+  ])
+
+  revalidatePath('/portal')
+  revalidatePath('/tickets')
+
+  return { success: !error, error: error?.message }
 }

@@ -1,6 +1,6 @@
-import { cookies } from 'next/headers';
 import { createClient } from '@/utils/supabase/server';
 import DashboardClient from './DashboardClient';
+import { requireAdminSession } from '@/utils/auth/admin';
 
 const URGENT_CLASSIFICATIONS = new Set(['Urgente', 'Bug']);
 
@@ -79,7 +79,7 @@ function buildSupportAnalytics(tickets) {
   let closed = 0;
 
   tickets.forEach((ticket) => {
-    if (ticket.status === 'closed') {
+    if (ticket.status === 'resolved' || ticket.status === 'closed') {
       closed += 1;
     } else {
       open += 1;
@@ -145,9 +145,10 @@ function buildTaskAnalytics(tasks, now) {
 }
 
 export default async function DashboardPage() {
+  const session = await requireAdminSession();
   const supabase = await createClient();
-  const cookieStore = await cookies();
-  const userName = cookieStore.get('session_user')?.value || 'Admin';
+  const boardOwner = session.username || 'Admin';
+  const displayName = session.fullName || boardOwner;
   const now = new Date();
   const today = now.toISOString();
   const trendStart = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString();
@@ -176,7 +177,7 @@ export default async function DashboardPage() {
       .order('date', { ascending: true }),
   ]);
 
-  const allTasks = (tasksResult.data || []).filter((task) => canAccessTask(task, userName));
+  const allTasks = (tasksResult.data || []).filter((task) => canAccessTask(task, boardOwner));
   const sortedTasks = [...allTasks].sort((left, right) => {
     const leftDeadline = left.deadline ? new Date(left.deadline).getTime() : Number.MAX_SAFE_INTEGER;
     const rightDeadline = right.deadline ? new Date(right.deadline).getTime() : Number.MAX_SAFE_INTEGER;
@@ -186,7 +187,7 @@ export default async function DashboardPage() {
   const highPriorityTasks = sortedTasks.filter((task) => task.priority === 'high');
   const allTickets = ticketsResult.data || [];
   const urgentTickets = allTickets.filter(
-    (ticket) => ticket.status === 'open' && URGENT_CLASSIFICATIONS.has(ticket.classification)
+    (ticket) => !['resolved', 'closed'].includes(ticket.status) && URGENT_CLASSIFICATIONS.has(ticket.classification)
   );
   const upcomingEvents = eventsResult.data || [];
   const clients = clientsResult.data || [];
@@ -202,7 +203,7 @@ export default async function DashboardPage() {
 
   return (
     <DashboardClient
-      userName={userName}
+      userName={displayName}
       tasks={highPriorityTasks}
       tickets={urgentTickets}
       events={upcomingEvents}

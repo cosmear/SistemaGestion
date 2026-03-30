@@ -17,13 +17,13 @@ export default function PortalTopBar({ clientName }) {
                <p className="text-xs text-brand-600 font-bold uppercase tracking-widest">{clientName}</p>
              </div>
           </div>
-          
+
           <div className="flex items-center">
-            <button 
+            <button
               onClick={() => logoutClientPortal()}
               className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-red-500 hover:bg-red-50 px-4 py-2 rounded-xl transition-all"
             >
-              Cerrar Sesión <SignOut weight="bold" />
+              Cerrar sesion <SignOut weight="bold" />
             </button>
           </div>
         </div>

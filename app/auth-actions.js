@@ -2,31 +2,24 @@
 
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-
-const USERS = {
-  Cosme: 'Cosme 2002',
-  Nacho: 'Nachoesputo'
-}
+import { authenticateAdminUser, createAdminSession, destroyAdminSession } from '@/utils/auth/admin'
 
 export async function loginUser(formData) {
   const username = formData.get('username')
   const password = formData.get('password')
+  const user = await authenticateAdminUser(username, password)
 
-  if (USERS[username] && USERS[username] === password) {
-    const cookieStore = await cookies()
-    cookieStore.set('session_user', username, { 
-       httpOnly: true, 
-       path: '/', 
-       maxAge: 60 * 60 * 24 * 7 // 1 week
-    })
+  if (user) {
+    await createAdminSession(user)
     return { success: true }
   }
 
-  return { success: false, error: 'Credenciales incorrectas' }
+  return { success: false, error: 'Credenciales incorrectas o usuario inactivo.' }
 }
 
 export async function logoutUser() {
   const cookieStore = await cookies()
   cookieStore.delete('session_user')
+  await destroyAdminSession()
   redirect('/login')
 }

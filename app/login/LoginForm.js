@@ -10,19 +10,18 @@ export default function LoginForm() {
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const handleSubmit = async (event) => {
+    event.preventDefault()
     setLoading(true)
     setError(null)
-    
-    // Server action returns success bool
-    const formData = new FormData(e.target)
-    const res = await loginUser(formData)
-    
-    if (res.success) {
+
+    const formData = new FormData(event.target)
+    const response = await loginUser(formData)
+
+    if (response.success) {
       router.push('/')
     } else {
-      setError(res.error)
+      setError(response.error)
       setLoading(false)
     }
   }
@@ -46,7 +45,7 @@ export default function LoginForm() {
 
       <div>
         <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-          Contraseña
+          Contrasena
         </label>
         <div className="mt-1">
           <input
@@ -62,7 +61,7 @@ export default function LoginForm() {
 
       {error && (
         <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-100 font-medium animate-fade-in flex items-center gap-2">
-          ❌ {error}
+          Error: {error}
         </div>
       )}
 

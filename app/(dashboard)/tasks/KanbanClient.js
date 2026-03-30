@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Trash, CalendarBlank, CaretDown, User, Users, Briefcase, List, CircleHalf, CheckCircle } from '@phosphor-icons/react';
 import { addKanbanTask, updateTaskColumn, deleteKanbanTask } from '@/app/actions';
@@ -10,10 +10,6 @@ export default function KanbanClient({ initialColumns, initialTasks, activeBoard
   const [showModal, setShowModal] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
-
-  useEffect(() => {
-    setTasks(initialTasks || []);
-  }, [initialTasks, activeBoard]);
 
   const handleDragStart = (e, task) => {
     e.dataTransfer.setData('taskId', task.id);

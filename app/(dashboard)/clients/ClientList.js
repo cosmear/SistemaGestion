@@ -1,13 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Buildings,
+  CalendarBlank,
+  CurrencyCircleDollar,
   EnvelopeOpen,
   HandCoins,
   Key,
   MagnifyingGlass,
+  NotePencil,
   PencilSimple,
   Plus,
   Trash,
@@ -22,6 +25,7 @@ import {
   updateClient,
   updateClientStatus,
 } from '@/app/actions';
+import { CLIENT_ONBOARDING_OPTIONS, getOnboardingMeta } from '@/utils/constants';
 
 const STATUS_FILTERS = [
   { key: 'all', label: 'Todos' },
@@ -29,7 +33,7 @@ const STATUS_FILTERS = [
   { key: 'inactive', label: 'Inactivos' },
 ];
 
-export default function ClientList({ initialClients, clientCredentials, clientTickets }) {
+export default function ClientList({ initialClients, clientCredentials, clientTickets, clientInvoices }) {
   const router = useRouter();
   const [clients, setClients] = useState(initialClients || []);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,10 +44,6 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
   const [togglingClientId, setTogglingClientId] = useState(null);
   const [credModal, setCredModal] = useState({ open: false, client: null, currentCred: null });
   const [isCredSubmitting, setIsCredSubmitting] = useState(false);
-
-  useEffect(() => {
-    setClients(initialClients || []);
-  }, [initialClients]);
 
   const formatMoney = (value) =>
     new Intl.NumberFormat('es-AR', {
@@ -68,26 +68,56 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
 
     ticketMap[ticket.client_id].total += 1;
 
-    if (ticket.status === 'open') {
+    if (!['resolved', 'closed'].includes(ticket.status)) {
       ticketMap[ticket.client_id].open += 1;
+    }
+  });
+
+  const invoiceMap = {};
+  (clientInvoices || []).forEach((invoice) => {
+    if (!invoiceMap[invoice.client_id]) {
+      invoiceMap[invoice.client_id] = { open: 0, overdue: 0, total: 0, outstandingAmount: 0 };
+    }
+
+    invoiceMap[invoice.client_id].total += 1;
+
+    if (invoice.status === 'overdue') {
+      invoiceMap[invoice.client_id].overdue += 1;
+    }
+
+    if (['draft', 'pending', 'overdue'].includes(invoice.status)) {
+      invoiceMap[invoice.client_id].open += 1;
+      invoiceMap[invoice.client_id].outstandingAmount += Number(invoice.amount || 0);
     }
   });
 
   const activeClients = clients.filter((client) => client.status === 'active');
   const inactiveClients = clients.filter((client) => client.status === 'inactive');
   const totalMrr = activeClients.reduce((total, client) => total + Number(client.pack_monthly_fee || 0), 0);
-  const openTicketsCount = (clientTickets || []).filter((ticket) => ticket.status === 'open').length;
+  const openTicketsCount = (clientTickets || []).filter((ticket) => !['resolved', 'closed'].includes(ticket.status)).length;
   const portalEnabledCount = (clientCredentials || []).length;
+  const overdueInvoicesCount = (clientInvoices || []).filter((invoice) => invoice.status === 'overdue').length;
+  const outstandingAmount = (clientInvoices || [])
+    .filter((invoice) => ['draft', 'pending', 'overdue'].includes(invoice.status))
+    .reduce((total, invoice) => total + Number(invoice.amount || 0), 0);
   const isEditMode = clientModal.mode === 'edit' && Boolean(clientModal.client);
   const modalClient = clientModal.client;
 
   const normalizedSearch = searchTerm.trim().toLowerCase();
   const visibleClients = clients.filter((client) => {
-    const matchesSearch =
-      normalizedSearch.length === 0 ||
-      client.name?.toLowerCase().includes(normalizedSearch) ||
-      client.website_url?.toLowerCase().includes(normalizedSearch) ||
-      client.phone_whatsapp?.toLowerCase().includes(normalizedSearch);
+    const searchableFields = [
+      client.name,
+      client.website_url,
+      client.phone_whatsapp,
+      client.contact_name,
+      client.contact_email,
+      client.notes,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    const matchesSearch = normalizedSearch.length === 0 || searchableFields.includes(normalizedSearch);
 
     const matchesStatus = statusFilter === 'all' || client.status === statusFilter;
 
@@ -128,6 +158,11 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
       pack_monthly_fee: parseFloat(formData.get('pack_monthly_fee')) || 0,
       website_url: formData.get('website_url') || null,
       phone_whatsapp: formData.get('phone_whatsapp') || null,
+      contact_name: formData.get('contact_name') || null,
+      contact_email: formData.get('contact_email') || null,
+      onboarding_status: formData.get('onboarding_status') || 'pending',
+      renewal_date: formData.get('renewal_date') || null,
+      notes: formData.get('notes') || null,
     };
 
     const result =
@@ -208,7 +243,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
 
   const handleDeleteClient = async (clientId, clientName) => {
     const confirmed = confirm(
-      `Eliminar a "${clientName}"?\n\nSe borraran su acceso al portal, tickets y tablero de tareas del cliente. El historial presupuestario no se toca.`
+      `Eliminar a "${clientName}"?\n\nSe borraran su acceso al portal, tickets, facturas y tablero de tareas del cliente.`
     );
 
     if (!confirmed) {
@@ -236,14 +271,32 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
     refreshData();
   };
 
+  const getHealthTone = (ticketInfo, invoiceInfo) => {
+    if ((invoiceInfo?.overdue || 0) > 0) {
+      return 'bg-rose-50 text-rose-700';
+    }
+
+    if ((ticketInfo?.open || 0) >= 3) {
+      return 'bg-amber-50 text-amber-700';
+    }
+
+    return 'bg-emerald-50 text-emerald-700';
+  };
+
+  const getHealthLabel = (ticketInfo, invoiceInfo) => {
+    if ((invoiceInfo?.overdue || 0) > 0) return 'Cobro en riesgo';
+    if ((ticketInfo?.open || 0) >= 3) return 'Alta demanda';
+    return 'Saludable';
+  };
+
   return (
     <div className="absolute inset-0 flex h-full flex-col overflow-y-auto bg-gray-50 p-4 sm:p-8 animate-fade-in custom-scrollbar">
       <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.24em] text-gray-400">Clientes</p>
-          <h3 className="mt-2 text-3xl font-black tracking-tight text-gray-900">Directorio comercial y operativo</h3>
+          <h3 className="mt-2 text-3xl font-black tracking-tight text-gray-900">CRM comercial y operativo</h3>
           <p className="mt-2 text-sm font-medium text-gray-500">
-            Gestiona marcas, fees, accesos al portal y limpieza de cartera desde un solo lugar.
+            Gestiona contactos, onboarding, acceso al portal y estado de cobranzas desde un solo lugar.
           </p>
         </div>
 
@@ -256,7 +309,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
         </button>
       </div>
 
-      <div className="mb-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+      <div className="mb-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-5">
         <div className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
           <div className="flex items-center justify-between">
             <div>
@@ -288,7 +341,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">Portales activos</p>
               <p className="mt-3 text-3xl font-black tracking-tight text-indigo-700">{portalEnabledCount}</p>
-              <p className="mt-2 text-sm font-medium text-gray-500">Clientes con credenciales B2B configuradas</p>
+              <p className="mt-2 text-sm font-medium text-gray-500">Clientes con acceso B2B configurado</p>
             </div>
             <div className="rounded-2xl bg-indigo-50 p-3 text-indigo-600">
               <Key className="text-2xl" weight="fill" />
@@ -308,6 +361,19 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
             </div>
           </div>
         </div>
+
+        <div className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">Cobranza abierta</p>
+              <p className="mt-3 text-3xl font-black tracking-tight text-rose-700">{formatMoney(outstandingAmount)}</p>
+              <p className="mt-2 text-sm font-medium text-gray-500">{overdueInvoicesCount} facturas vencidas</p>
+            </div>
+            <div className="rounded-2xl bg-rose-50 p-3 text-rose-600">
+              <CurrencyCircleDollar className="text-2xl" weight="fill" />
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="mb-6 rounded-[28px] border border-gray-200 bg-white p-4 shadow-[0_12px_35px_rgba(15,23,42,0.04)]">
@@ -318,7 +384,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
               type="text"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Buscar por nombre, web o WhatsApp..."
+              placeholder="Buscar por marca, contacto, email o nota..."
               className="w-full rounded-2xl border border-gray-200 bg-gray-50 py-3 pl-11 pr-4 text-sm font-medium text-gray-700 outline-none transition-all focus:border-brand-300 focus:bg-white focus:ring-2 focus:ring-brand-500"
             />
           </div>
@@ -354,10 +420,12 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
           {visibleClients.map((client) => {
             const credentials = (clientCredentials || []).find((credential) => credential.client_id === client.id) || null;
             const ticketInfo = ticketMap[client.id] || { open: 0, total: 0 };
+            const invoiceInfo = invoiceMap[client.id] || { open: 0, overdue: 0, total: 0, outstandingAmount: 0 };
             const clientUrl = buildClientUrl(client.website_url);
             const isDeleting = deletingClientId === client.id;
             const isToggling = togglingClientId === client.id;
             const isInactive = client.status === 'inactive';
+            const onboardingMeta = getOnboardingMeta(client.onboarding_status || 'pending');
 
             return (
               <article
@@ -377,24 +445,29 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
                     </div>
                   </div>
 
-                  <span
-                    className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] ${
-                      isInactive ? 'bg-gray-100 text-gray-500' : 'bg-emerald-50 text-emerald-700'
-                    }`}
-                  >
-                    {isInactive ? 'Inactivo' : 'Activo'}
-                  </span>
+                  <div className="space-y-2 text-right">
+                    <span
+                      className={`inline-flex rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] ${
+                        isInactive ? 'bg-gray-100 text-gray-500' : 'bg-emerald-50 text-emerald-700'
+                      }`}
+                    >
+                      {isInactive ? 'Inactivo' : 'Activo'}
+                    </span>
+                    <div className={`rounded-full px-3 py-1 text-[11px] font-black ${getHealthTone(ticketInfo, invoiceInfo)}`}>
+                      {getHealthLabel(ticketInfo, invoiceInfo)}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   <span className={`rounded-full px-3 py-1 text-[11px] font-black uppercase shadow-sm ${packTypes[client.pack_type]?.badge || packTypes['0'].badge}`}>
                     {packTypes[client.pack_type]?.name || 'Sin pack'}
                   </span>
+                  <span className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase ${onboardingMeta.className}`}>
+                    {onboardingMeta.label}
+                  </span>
                   <span className={`rounded-full px-3 py-1 text-[11px] font-black uppercase ${credentials ? 'bg-indigo-50 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}>
                     {credentials ? 'Portal activo' : 'Sin portal'}
-                  </span>
-                  <span className={`rounded-full px-3 py-1 text-[11px] font-black uppercase ${ticketInfo.open > 0 ? 'bg-orange-50 text-orange-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                    {ticketInfo.open > 0 ? `${ticketInfo.open} tickets abiertos` : 'Inbox limpio'}
                   </span>
                 </div>
 
@@ -408,12 +481,31 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
                     <p className="mt-2 text-sm font-black text-brand-700">{formatMoney(client.pack_monthly_fee)}</p>
                   </div>
                   <div className="rounded-2xl bg-gray-50 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">Tickets</p>
-                    <p className="mt-2 text-sm font-black text-gray-900">{ticketInfo.total}</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">Cobranza</p>
+                    <p className="mt-2 text-sm font-black text-gray-900">{formatMoney(invoiceInfo.outstandingAmount)}</p>
                   </div>
                 </div>
 
                 <div className="mt-5 rounded-[24px] border border-gray-100 bg-gray-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-black uppercase tracking-[0.18em] text-gray-400">Contacto</span>
+                    <span className="text-sm font-semibold text-gray-700">{client.contact_name || 'Sin cargar'}</span>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <span className="text-xs font-black uppercase tracking-[0.18em] text-gray-400">Email</span>
+                    <span className="text-sm font-semibold text-gray-600">{client.contact_email || 'No definido'}</span>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <span className="text-xs font-black uppercase tracking-[0.18em] text-gray-400">Renovacion</span>
+                    <span className="text-sm font-semibold text-gray-600">
+                      {client.renewal_date ? new Date(client.renewal_date).toLocaleDateString('es-AR') : 'Sin fecha'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-5 rounded-[24px] border border-gray-100 bg-white p-4 shadow-sm">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-xs font-black uppercase tracking-[0.18em] text-gray-400">Website</span>
                     {clientUrl ? (
@@ -436,6 +528,27 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
                       {client.phone_whatsapp || 'No configurado'}
                     </span>
                   </div>
+
+                  {client.notes ? (
+                    <div className="mt-4 rounded-2xl bg-gray-50 px-4 py-3 text-sm font-medium text-gray-600">
+                      {client.notes}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="mt-5 grid grid-cols-3 gap-3">
+                  <div className="rounded-2xl bg-orange-50 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-orange-500">Tickets</p>
+                    <p className="mt-2 text-sm font-black text-orange-700">{ticketInfo.open} abiertos</p>
+                  </div>
+                  <div className="rounded-2xl bg-blue-50 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-500">Facturas</p>
+                    <p className="mt-2 text-sm font-black text-blue-700">{invoiceInfo.open} abiertas</p>
+                  </div>
+                  <div className="rounded-2xl bg-rose-50 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-500">Vencidas</p>
+                    <p className="mt-2 text-sm font-black text-rose-700">{invoiceInfo.overdue}</p>
+                  </div>
                 </div>
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -455,7 +568,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
-                    {credentials ? 'Editar portal' : 'Dar acceso portal'}
+                    {credentials ? 'Reset portal' : 'Dar acceso portal'}
                   </button>
 
                   <button
@@ -487,15 +600,15 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
 
       {clientModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[32px] bg-white shadow-2xl custom-scrollbar animate-fade-in">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[32px] bg-white shadow-2xl custom-scrollbar animate-fade-in">
             <div className="border-b border-gray-100 bg-gray-50 p-6">
               <h3 className="text-2xl font-black tracking-tight text-gray-900">
                 {isEditMode ? 'Editar cliente' : 'Nuevo cliente'}
               </h3>
               <p className="mt-2 text-sm font-medium text-gray-500">
                 {isEditMode
-                  ? 'Actualiza los datos comerciales del cliente desde este modal.'
-                  : 'Crea la ficha comercial y, si corresponde, deja listo su fee de desarrollo y mensualidad.'}
+                  ? 'Actualiza los datos comerciales, CRM y renovacion de la cuenta.'
+                  : 'Crea la ficha comercial y deja listo el seguimiento operativo desde el dia uno.'}
               </p>
             </div>
 
@@ -541,6 +654,78 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
                       className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm font-medium text-gray-800 outline-none transition-all focus:border-brand-300 focus:ring-2 focus:ring-brand-500"
                     />
                   </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="border-b border-brand-100 pb-2 text-xs font-black uppercase tracking-[0.2em] text-brand-600">
+                  CRM y seguimiento
+                </h4>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-bold text-gray-700">Contacto principal</label>
+                    <input
+                      type="text"
+                      name="contact_name"
+                      placeholder="Nombre y apellido"
+                      defaultValue={modalClient?.contact_name || ''}
+                      className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm font-medium text-gray-800 outline-none transition-all focus:border-brand-300 focus:ring-2 focus:ring-brand-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-bold text-gray-700">Email contacto</label>
+                    <input
+                      type="email"
+                      name="contact_email"
+                      placeholder="contacto@marca.com"
+                      defaultValue={modalClient?.contact_email || ''}
+                      className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm font-medium text-gray-800 outline-none transition-all focus:border-brand-300 focus:ring-2 focus:ring-brand-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-bold text-gray-700">Onboarding</label>
+                    <select
+                      name="onboarding_status"
+                      defaultValue={modalClient?.onboarding_status || 'pending'}
+                      className="w-full rounded-2xl border border-gray-300 bg-gray-50 px-4 py-3 text-sm font-bold text-gray-700 outline-none transition-all focus:border-brand-300 focus:ring-2 focus:ring-brand-500"
+                    >
+                      {CLIENT_ONBOARDING_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 flex items-center gap-1.5 text-sm font-bold text-gray-700">
+                      <CalendarBlank className="text-gray-400" />
+                      Renovacion
+                    </label>
+                    <input
+                      type="date"
+                      name="renewal_date"
+                      defaultValue={modalClient?.renewal_date || ''}
+                      className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm font-medium text-gray-800 outline-none transition-all focus:border-brand-300 focus:ring-2 focus:ring-brand-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 flex items-center gap-1.5 text-sm font-bold text-gray-700">
+                    <NotePencil className="text-gray-400" />
+                    Notas internas
+                  </label>
+                  <textarea
+                    name="notes"
+                    rows="3"
+                    placeholder="Hallazgos, acuerdos, renovaciones, alertas..."
+                    defaultValue={modalClient?.notes || ''}
+                    className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm font-medium text-gray-800 outline-none transition-all focus:border-brand-300 focus:ring-2 focus:ring-brand-500 resize-none"
+                  />
                 </div>
               </div>
 
@@ -621,6 +806,11 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
               <p className="mt-2 text-sm font-medium text-gray-500">
                 Configura el acceso de <b>{credModal.client.name}</b> a su portal privado.
               </p>
+              {credModal.currentCred ? (
+                <p className="mt-3 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-gray-600 shadow-sm">
+                  Email activo: <span className="font-black text-indigo-700">{credModal.currentCred.email}</span>
+                </p>
+              ) : null}
             </div>
 
             <form onSubmit={handleSaveCredential} className="space-y-4 p-6">
@@ -636,14 +826,16 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-bold text-gray-700">Contrasena</label>
+                <label className="mb-1.5 block text-sm font-bold text-gray-700">Nueva contrasena</label>
                 <input
-                  type="text"
+                  type="password"
                   name="password"
                   required
-                  defaultValue={credModal.currentCred?.password || ''}
                   className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm font-medium text-gray-800 outline-none transition-all focus:border-indigo-300 focus:ring-2 focus:ring-indigo-500"
                 />
+                <p className="mt-2 text-xs font-medium text-gray-500">
+                  Al guardar se reemplaza la credencial anterior por esta nueva combinacion.
+                </p>
               </div>
 
               <div className="grid gap-3 pt-4">

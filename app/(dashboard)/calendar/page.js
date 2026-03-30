@@ -1,20 +1,18 @@
 import { createClient } from '@/utils/supabase/server';
 import CalendarClient from './CalendarClient';
-import { cookies } from 'next/headers';
+import { requireAdminSession } from '@/utils/auth/admin';
 
 export default async function CalendarPage() {
-  const cookieStore = await cookies();
-  const userName = cookieStore.get('session_user')?.value || 'Guest';
+  const session = await requireAdminSession();
+  const userName = session.username || 'Admin';
   const supabase = await createClient();
 
-  // Traer tareas con fecha límite haciendo un INNER JOIN con kanban_columns
-  // para evaluar el board_id al que pertenece cada tarea
   const { data: tasks, error } = await supabase
     .from('kanban_tasks')
     .select(`
-      id, 
-      title, 
-      deadline, 
+      id,
+      title,
+      deadline,
       priority,
       kanban_columns!inner(board_id)
     `)
@@ -24,76 +22,68 @@ export default async function CalendarPage() {
   if (error) {
     return (
       <div className="p-8 text-center text-red-500 font-medium">
-        Error conectando a Supabase Kanban/Calendar. Intenta recargar la página.
+        Error conectando a Supabase Kanban/Calendar. Intenta recargar la pagina.
       </div>
     );
   }
 
-  // Filtrar según la lógica de Privacidad Multi-Tablero:
-  // - Ocultar cualquier tablero 'personal_' que NO sea el del usuario logueado en la Cookie.
-  // - Mostrar todo lo de 'team'
-  // - Mostrar todo lo de 'client_xyz'
-  const authorizedTasks = tasks.filter(t => {
-    const boardId = t.kanban_columns.board_id;
+  const authorizedTasks = tasks.filter((task) => {
+    const boardId = task.kanban_columns.board_id;
+
     if (boardId.startsWith('personal_') && boardId !== `personal_${userName}`) {
-      return false; // Es un espacio personal de OTRA persona, no lo mostramos.
+      return false;
     }
-    return true; // Pasa el filtro de privacidad
+
+    return true;
   });
 
-  // Convertirlas a formato FullCalendar accounts
-  const events = authorizedTasks.map(t => {
-    const boardId = t.kanban_columns.board_id;
-    let bgColor = '#9CA3AF'; // fallback
+  const events = authorizedTasks.map((task) => {
+    const boardId = task.kanban_columns.board_id;
+    let bgColor = '#9CA3AF';
     let typeName = '';
 
-    // Colores según contexto (para diferenciar en la grilla del calendario)
     if (boardId === `personal_${userName}`) {
-      bgColor = '#8B5CF6'; // Púrpura (Personal)
-      typeName = ''; // No hace falta prefix
+      bgColor = '#8B5CF6';
     } else if (boardId === 'team') {
-      bgColor = '#3B82F6'; // Azul (Equipo)
-      typeName = '🤝 ';
+      bgColor = '#3B82F6';
+      typeName = 'Team ';
     } else if (boardId.startsWith('client_')) {
-      bgColor = '#10B981'; // Verde (Clientes)
-      typeName = '💼 ';
+      bgColor = '#10B981';
+      typeName = 'Cliente ';
     }
 
     return {
-      id: `task_${t.id}`,
-      title: `${typeName}${t.title}`,
-      start: t.deadline,
+      id: `task_${task.id}`,
+      title: `${typeName}${task.title}`,
+      start: task.deadline,
       backgroundColor: bgColor,
       borderColor: 'transparent',
       extendedProps: {
-        priority: t.priority,
+        priority: task.priority,
         isTask: true,
-        originalId: t.id
-      }
+        originalId: task.id,
+      },
     };
   });
 
-  // Hito 9: Traer eventos independientes del calendario
-  const { data: rawEvents, error: evErr } = await supabase
+  const { data: rawEvents } = await supabase
     .from('calendar_events')
     .select('*')
     .order('date', { ascending: true });
 
-  const customEvents = (rawEvents || []).map(e => ({
-     id: `event_${e.id}`,
-     title: `📅 ${e.title}`,
-     start: e.date, // Soporta Date ISO string con o sin hora
-     backgroundColor: '#F97316', // Naranja para Eventos Puros
-     borderColor: 'transparent',
-     extendedProps: {
-        isEvent: true,
-        type: e.type,
-        originalId: e.id,
-        originalTitle: e.title
-     }
+  const customEvents = (rawEvents || []).map((event) => ({
+    id: `event_${event.id}`,
+    title: `Agenda ${event.title}`,
+    start: event.date,
+    backgroundColor: '#F97316',
+    borderColor: 'transparent',
+    extendedProps: {
+      isEvent: true,
+      type: event.type,
+      originalId: event.id,
+      originalTitle: event.title,
+    },
   }));
 
-  const allEvents = [...events, ...customEvents];
-
-  return <CalendarClient events={allEvents} />;
+  return <CalendarClient events={[...events, ...customEvents]} />;
 }

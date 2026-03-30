@@ -1,17 +1,9 @@
-import { cookies } from 'next/headers';
 import PortalTopBar from './PortalTopBar';
+import { requireClientSession } from '@/utils/auth/client';
 
 export default async function PortalLayout({ children }) {
-  const cookieStore = await cookies();
-  const sessionStr = cookieStore.get('client_session')?.value;
-  let clientName = 'Cliente';
-  
-  if (sessionStr) {
-    try {
-       const session = JSON.parse(sessionStr);
-       clientName = session.clientName || 'Cliente';
-    } catch(e) {}
-  }
+  const session = await requireClientSession();
+  const clientName = session.clientName || 'Cliente';
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans">

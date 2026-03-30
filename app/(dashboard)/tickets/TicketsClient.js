@@ -1,133 +1,375 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { EnvelopeOpen, CheckCircle, Warning, Tag, Check, X } from '@phosphor-icons/react';
-import { updateTicketStatus, updateTicketClassification } from '@/app/actions';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  ArrowsClockwise,
+  CalendarBlank,
+  ChatCircleText,
+  ClockCountdown,
+  Kanban,
+  Lifebuoy,
+  PaperPlaneRight,
+  Tag,
+  UserCircle,
+} from '@phosphor-icons/react';
+import { addTicketComment, convertTicketToTask, updateTicketDetails } from '@/app/actions';
+import {
+  getTicketPriorityMeta,
+  getTicketStatusMeta,
+  TICKET_CLASSIFICATION_OPTIONS,
+  TICKET_PRIORITY_OPTIONS,
+  TICKET_STATUS_OPTIONS,
+} from '@/utils/constants';
 
 export default function TicketsClient({ initialTickets }) {
+  const router = useRouter();
   const [tickets, setTickets] = useState(initialTickets || []);
-  const [activeTab, setActiveTab] = useState('open'); // 'open' or 'closed'
+  const [activeTab, setActiveTab] = useState('open');
+  const [selectedTicketId, setSelectedTicketId] = useState(initialTickets?.[0]?.id || null);
+  const [commentMessage, setCommentMessage] = useState('');
+  const [commentVisibility, setCommentVisibility] = useState('internal');
+  const [isCommentSubmitting, setIsCommentSubmitting] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
 
-  // Update client state when server props change
-  useEffect(() => {
-    setTickets(initialTickets || []);
-  }, [initialTickets]);
+  const filteredTickets = (() => {
+    if (activeTab === 'resolved') {
+      return tickets.filter((ticket) => ticket.status === 'resolved' || ticket.status === 'closed');
+    }
 
-  const handleStatusToggle = async (id, currentStatus) => {
-    const newStatus = currentStatus === 'open' ? 'closed' : 'open';
-    // Optimistic
-    setTickets(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
-    await updateTicketStatus(id, newStatus);
+    return tickets.filter((ticket) => !['resolved', 'closed'].includes(ticket.status));
+  })();
+
+  const selectedTicket =
+    tickets.find((ticket) => ticket.id === selectedTicketId) ||
+    filteredTickets[0] ||
+    null;
+
+  const patchTicketLocal = (ticketId, updates) => {
+    setTickets((currentTickets) =>
+      currentTickets.map((ticket) => (ticket.id === ticketId ? { ...ticket, ...updates } : ticket))
+    );
   };
 
-  const handleClassification = async (id, val) => {
-    setTickets(prev => prev.map(t => t.id === id ? { ...t, classification: val } : t));
-    await updateTicketClassification(id, val);
-  };
+  const handleFieldUpdate = async (ticketId, updates) => {
+    patchTicketLocal(ticketId, updates);
+    const result = await updateTicketDetails(ticketId, updates);
 
-  const filteredTickets = tickets.filter(t => t.status === activeTab);
-
-  const getPillColor = (classification) => {
-    switch(classification) {
-       case 'Bug': return 'bg-red-100 text-red-700';
-       case 'Urgente': return 'bg-orange-100 text-orange-700 font-bold';
-       case 'Cambio de Contenido': return 'bg-blue-100 text-blue-700';
-       case 'Facturación': return 'bg-emerald-100 text-emerald-700';
-       default: return 'bg-gray-100 text-gray-600';
+    if (!result.success) {
+      alert(result.error || 'No se pudo actualizar el ticket.');
+      router.refresh();
     }
   };
 
+  const handleAddComment = async (event) => {
+    event.preventDefault();
+
+    if (!selectedTicket || !commentMessage.trim()) {
+      return;
+    }
+
+    setIsCommentSubmitting(true);
+    const result = await addTicketComment(selectedTicket.id, commentMessage, commentVisibility);
+
+    if (!result.success) {
+      alert(result.error || 'No se pudo guardar el comentario.');
+      setIsCommentSubmitting(false);
+      return;
+    }
+
+    setCommentMessage('');
+    setCommentVisibility('internal');
+    setIsCommentSubmitting(false);
+    router.refresh();
+  };
+
+  const handleConvert = async (ticketId) => {
+    setIsConverting(true);
+    const result = await convertTicketToTask(ticketId);
+
+    if (!result.success) {
+      alert(result.error || 'No se pudo convertir el ticket en tarea.');
+      setIsConverting(false);
+      return;
+    }
+
+    setIsConverting(false);
+    router.refresh();
+  };
+
+  const comments = [...(selectedTicket?.ticket_comments || [])].sort(
+    (left, right) => new Date(left.created_at) - new Date(right.created_at)
+  );
+
   return (
-    <div className="h-full flex flex-col p-6 animate-fade-in block absolute inset-0">
-      <div className="flex justify-between items-center mb-6 shrink-0 border-b border-gray-200 pb-5">
-        <div>
-           <h3 className="text-2xl font-extrabold text-gray-900 tracking-tight flex items-center gap-3">
-             <EnvelopeOpen className="text-orange-500" /> Help Desk (Buzón de Clientes)
-           </h3>
-           <p className="text-sm text-gray-500 font-medium mt-1">Clasifica y marca como resueltos los pedidos de B2B.</p>
+    <div className="absolute inset-0 grid h-full grid-cols-1 gap-6 overflow-y-auto bg-gray-50 p-4 sm:p-8 xl:grid-cols-[0.9fr_1.1fr] custom-scrollbar">
+      <section className="rounded-[32px] border border-gray-200 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.05)] overflow-hidden">
+        <div className="border-b border-gray-100 p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.24em] text-gray-400">Soporte</p>
+              <h3 className="mt-2 text-2xl font-black tracking-tight text-gray-900">Inbox operativo</h3>
+            </div>
+            <div className="rounded-2xl bg-orange-50 p-3 text-orange-600">
+              <Lifebuoy weight="fill" className="text-2xl" />
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button
+              onClick={() => setActiveTab('open')}
+              className={`rounded-full px-4 py-2 text-sm font-bold transition-colors ${
+                activeTab === 'open' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              Abiertos ({tickets.filter((ticket) => !['resolved', 'closed'].includes(ticket.status)).length})
+            </button>
+            <button
+              onClick={() => setActiveTab('resolved')}
+              className={`rounded-full px-4 py-2 text-sm font-bold transition-colors ${
+                activeTab === 'resolved' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              Resueltos ({tickets.filter((ticket) => ['resolved', 'closed'].includes(ticket.status)).length})
+            </button>
+          </div>
         </div>
-      </div>
 
-      <div className="flex gap-4 mb-6">
-        <button 
-           onClick={() => setActiveTab('open')}
-           className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm flex items-center gap-2 ${activeTab === 'open' ? 'bg-orange-600 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50' }`}
-        >
-           <Warning weight={activeTab === 'open' ? 'fill' : 'regular'} /> BandEja de Entrada ({tickets.filter(t => t.status==='open').length})
-        </button>
-        <button 
-           onClick={() => setActiveTab('closed')}
-           className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm flex items-center gap-2 ${activeTab === 'closed' ? 'bg-green-600 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50' }`}
-        >
-           <CheckCircle weight={activeTab === 'closed' ? 'fill' : 'regular'} /> Resueltos ({tickets.filter(t => t.status==='closed').length})
-        </button>
-      </div>
+        <div className="max-h-[calc(100vh-18rem)] overflow-y-auto custom-scrollbar p-4">
+          {filteredTickets.length === 0 ? (
+            <div className="py-20 text-center text-gray-500 font-medium">
+              No hay tickets en esta vista.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredTickets.map((ticket) => {
+                const statusMeta = getTicketStatusMeta(ticket.status);
+                const priorityMeta = getTicketPriorityMeta(ticket.priority);
+                const isActive = ticket.id === selectedTicket?.id;
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar bg-white rounded-3xl border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] p-4">
-         {filteredTickets.length === 0 ? (
-           <div className="h-full flex flex-col items-center justify-center text-gray-400">
-              <CheckCircle className="text-6xl text-emerald-100 mb-4" weight="fill" />
-              <h4 className="text-lg font-bold text-gray-800">Todo limpio por aquí</h4>
-              <p className="text-sm">No hay tickets en esta categoría.</p>
-           </div>
-         ) : (
-           <div className="space-y-4">
-             {filteredTickets.map(ticket => (
-               <div key={ticket.id} className="border border-gray-200 rounded-2xl p-5 hover:shadow-md transition-shadow bg-gray-50/50 flex flex-col md:flex-row gap-6">
-                  {/* Info del Cliente y Asunto */}
-                  <div className="flex-1">
-                     <div className="flex items-center gap-3 mb-2">
-                        <span className="text-xs font-black uppercase text-brand-600 bg-brand-50 px-2.5 py-1 rounded-md tracking-widest border border-brand-100">
-                           🏢 {ticket.clients?.name || 'Cliente Eliminado'}
-                        </span>
-                        <span className="text-[11px] text-gray-400 font-bold">{new Date(ticket.created_at).toLocaleString('es-AR')}</span>
-                     </div>
-                     <h4 className="text-lg font-extrabold text-gray-900 mb-2">{ticket.title}</h4>
-                     <p className="text-sm text-gray-600 bg-white p-4 rounded-xl border border-gray-100 shadow-sm leading-relaxed whitespace-pre-wrap font-medium">
-                        {ticket.description}
-                     </p>
+                return (
+                  <button
+                    key={ticket.id}
+                    onClick={() => setSelectedTicketId(ticket.id)}
+                    className={`w-full rounded-[24px] border p-4 text-left transition-all ${
+                      isActive
+                        ? 'border-brand-300 bg-brand-50/50 shadow-[0_12px_30px_rgba(22,163,74,0.08)]'
+                        : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-black text-gray-900">{ticket.title}</p>
+                        <p className="mt-2 text-xs font-medium text-gray-500">
+                          {ticket.clients?.name || 'Cliente eliminado'} ·{' '}
+                          {new Date(ticket.created_at).toLocaleDateString('es-AR')}
+                        </p>
+                      </div>
+                      <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black ${statusMeta.className}`}>
+                        {statusMeta.label}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black ${priorityMeta.className}`}>
+                        {priorityMeta.label}
+                      </span>
+                      <span className="inline-flex rounded-full border border-gray-200 bg-gray-100 px-3 py-1 text-[11px] font-black text-gray-600">
+                        {ticket.classification || 'Sin clasificar'}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-[32px] border border-gray-200 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.05)] overflow-hidden">
+        {!selectedTicket ? (
+          <div className="flex h-full items-center justify-center text-gray-500 font-medium">
+            Selecciona un ticket para ver el detalle.
+          </div>
+        ) : (
+          <div className="flex h-full flex-col">
+            <div className="border-b border-gray-100 p-6">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.24em] text-gray-400">
+                    {selectedTicket.clients?.name || 'Cliente'}
+                  </p>
+                  <h3 className="mt-2 text-2xl font-black tracking-tight text-gray-900">{selectedTicket.title}</h3>
+                  <p className="mt-3 text-sm font-medium text-gray-600">{selectedTicket.description}</p>
+                </div>
+
+                <button
+                  onClick={() => handleConvert(selectedTicket.id)}
+                  disabled={isConverting}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-gray-900 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-black disabled:opacity-50"
+                >
+                  <Kanban weight="bold" />
+                  {isConverting ? 'Convirtiendo...' : 'Pasar a tarea'}
+                </button>
+              </div>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <FieldCard label="Estado">
+                  <select
+                    value={selectedTicket.status || 'new'}
+                    onChange={(event) => handleFieldUpdate(selectedTicket.id, { status: event.target.value })}
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-gray-700 outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-500"
+                  >
+                    {TICKET_STATUS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </FieldCard>
+
+                <FieldCard label="Prioridad">
+                  <select
+                    value={selectedTicket.priority || 'medium'}
+                    onChange={(event) => handleFieldUpdate(selectedTicket.id, { priority: event.target.value })}
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-gray-700 outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-500"
+                  >
+                    {TICKET_PRIORITY_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </FieldCard>
+
+                <FieldCard label="Clasificacion">
+                  <select
+                    value={selectedTicket.classification || ''}
+                    onChange={(event) => handleFieldUpdate(selectedTicket.id, { classification: event.target.value })}
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-gray-700 outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-500"
+                  >
+                    {TICKET_CLASSIFICATION_OPTIONS.map((option) => (
+                      <option key={option.value || 'empty'} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </FieldCard>
+
+                <FieldCard label="Responsable">
+                  <input
+                    type="text"
+                    value={selectedTicket.assigned_to || ''}
+                    onChange={(event) => patchTicketLocal(selectedTicket.id, { assigned_to: event.target.value })}
+                    onBlur={(event) => handleFieldUpdate(selectedTicket.id, { assigned_to: event.target.value })}
+                    placeholder="Sin asignar"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-gray-700 outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-500"
+                  />
+                </FieldCard>
+
+                <FieldCard label="Vencimiento">
+                  <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
+                    <CalendarBlank className="text-gray-400" />
+                    <input
+                      type="date"
+                      value={selectedTicket.due_at ? String(selectedTicket.due_at).slice(0, 10) : ''}
+                      onChange={(event) => patchTicketLocal(selectedTicket.id, { due_at: event.target.value })}
+                      onBlur={(event) => handleFieldUpdate(selectedTicket.id, { due_at: event.target.value || null })}
+                      className="w-full bg-transparent text-sm font-bold text-gray-700 outline-none"
+                    />
+                  </div>
+                </FieldCard>
+              </div>
+            </div>
+
+            <div className="grid flex-1 grid-cols-1 gap-6 p-6 xl:grid-cols-[1fr_0.9fr]">
+              <div className="rounded-[28px] border border-gray-100 bg-gray-50 p-5">
+                <div className="mb-4 flex items-center gap-3">
+                  <ChatCircleText className="text-brand-600" weight="fill" />
+                  <h4 className="text-lg font-black text-gray-900">Conversacion</h4>
+                </div>
+
+                <div className="max-h-[360px] space-y-3 overflow-y-auto custom-scrollbar pr-2">
+                  {comments.length === 0 ? (
+                    <p className="text-sm font-medium text-gray-500">Todavia no hay comentarios en este ticket.</p>
+                  ) : (
+                    comments.map((comment) => (
+                      <div key={comment.id} className="rounded-2xl border border-white bg-white p-4 shadow-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <UserCircle className="text-gray-400" weight="fill" />
+                            <span className="text-sm font-black text-gray-900">{comment.author_name}</span>
+                            <span className="text-xs font-bold text-gray-400 uppercase">{comment.author_role}</span>
+                          </div>
+                          <span className={`rounded-full px-3 py-1 text-[11px] font-black ${comment.visibility === 'public' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                            {comment.visibility === 'public' ? 'Publico' : 'Interno'}
+                          </span>
+                        </div>
+                        <p className="mt-3 text-sm font-medium text-gray-700">{comment.message}</p>
+                        <p className="mt-3 text-xs font-medium text-gray-400">
+                          {new Date(comment.created_at).toLocaleString('es-AR')}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-[28px] border border-gray-100 bg-gray-50 p-5">
+                <div className="mb-4 flex items-center gap-3">
+                  <ClockCountdown className="text-brand-600" weight="fill" />
+                  <h4 className="text-lg font-black text-gray-900">Responder</h4>
+                </div>
+
+                <form onSubmit={handleAddComment} className="space-y-4">
+                  <div>
+                    <label className="mb-1.5 flex items-center gap-2 text-sm font-bold text-gray-700">
+                      <Tag className="text-gray-400" />
+                      Visibilidad
+                    </label>
+                    <select
+                      value={commentVisibility}
+                      onChange={(event) => setCommentVisibility(event.target.value)}
+                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-500"
+                    >
+                      <option value="internal">Interno</option>
+                      <option value="public">Visible para el cliente</option>
+                    </select>
                   </div>
 
-                  {/* Acciones del Administrador */}
-                  <div className="w-full md:w-64 shrink-0 flex flex-col gap-4 border-l border-gray-200 pl-6 border-dashed">
-                     <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1 mb-2"><Tag/> Clasificación Oculta</label>
-                        <select 
-                           value={ticket.classification || ''} 
-                           onChange={(e) => handleClassification(ticket.id, e.target.value)}
-                           className={`w-full text-xs font-bold px-3 py-2 rounded-lg border outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-brand-500 ${getPillColor(ticket.classification)}`}
-                        >
-                           <option value="" className="bg-white text-gray-700">📌 Sin Clasificar</option>
-                           <option value="Urgente" className="bg-white text-gray-700">🚨 Urgente (+24hs)</option>
-                           <option value="Bug" className="bg-white text-gray-700">🐞 Bug / Fallo</option>
-                           <option value="Cambio de Contenido" className="bg-white text-gray-700">📝 Cambio de Contenido</option>
-                           <option value="Facturación" className="bg-white text-gray-700">💵 Facturación</option>
-                        </select>
-                     </div>
-
-                     <div className="mt-auto">
-                        {ticket.status === 'open' ? (
-                           <button 
-                              onClick={() => handleStatusToggle(ticket.id, 'open')}
-                              className="w-full py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
-                           >
-                              <Check weight="bold" /> Marcar como Resuelto
-                           </button>
-                        ) : (
-                           <button 
-                              onClick={() => handleStatusToggle(ticket.id, 'closed')}
-                              className="w-full py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
-                           >
-                              <X weight="bold" /> Reabrir Ticket
-                           </button>
-                        )}
-                     </div>
+                  <div>
+                    <textarea
+                      rows="8"
+                      value={commentMessage}
+                      onChange={(event) => setCommentMessage(event.target.value)}
+                      placeholder="Escribe una respuesta, contexto interno o pedido de seguimiento..."
+                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-500 resize-none"
+                    />
                   </div>
-               </div>
-             ))}
-           </div>
-         )}
-      </div>
 
+                  <button
+                    type="submit"
+                    disabled={isCommentSubmitting}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-600 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+                  >
+                    {isCommentSubmitting ? <ArrowsClockwise className="animate-spin" /> : <PaperPlaneRight weight="bold" />}
+                    {isCommentSubmitting ? 'Guardando comentario...' : 'Guardar comentario'}
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function FieldCard({ label, children }) {
+  return (
+    <div className="rounded-2xl bg-gray-50 px-4 py-3">
+      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">{label}</p>
+      <div className="mt-3">{children}</div>
     </div>
   );
 }

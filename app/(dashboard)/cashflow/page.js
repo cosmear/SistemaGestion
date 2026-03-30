@@ -1,10 +1,11 @@
 import { createClient } from '@/utils/supabase/server';
 import CashflowClient from './CashflowClient';
+import { requireAdminSession } from '@/utils/auth/admin';
 
 export default async function CashflowPage() {
+  await requireAdminSession();
   const supabase = await createClient();
 
-  // Fetch transactions directly from Supabase 
   const { data: transactions, error } = await supabase
     .from('cashflow')
     .select('*')
@@ -13,31 +14,27 @@ export default async function CashflowPage() {
   if (error) {
     return (
       <div className="p-8 text-center text-red-500 font-medium">
-        Error conectando a Supabase Cashflow. Verifique que la tabla exista.
+        Error conectando a Supabase Cashflow. Verifica que la tabla exista.
       </div>
     );
   }
 
-  // Calculate totals Server-Side 
   let totalIn = 0;
   let totalOut = 0;
-  
+
   if (transactions) {
-    transactions.forEach(t => {
-      if (t.type === 'income') totalIn += Number(t.amount);
-      if (t.type === 'expense') totalOut += Number(t.amount);
+    transactions.forEach((transaction) => {
+      if (transaction.type === 'income') totalIn += Number(transaction.amount);
+      if (transaction.type === 'expense') totalOut += Number(transaction.amount);
     });
   }
-  
-  const balance = totalIn - totalOut;
 
-  // Render the Client component passing the Server-Side props
   return (
-    <CashflowClient 
-      transactions={transactions} 
+    <CashflowClient
+      transactions={transactions}
       totalIn={totalIn}
       totalOut={totalOut}
-      balance={balance}
+      balance={totalIn - totalOut}
     />
   );
 }

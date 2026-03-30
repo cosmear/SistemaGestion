@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
+import { verifySessionToken } from '@/utils/auth/token';
 
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
-  
-  // Public paths unauthenticated ok
+  const adminSession = verifySessionToken(request.cookies.get('admin_session')?.value);
+  const clientSession = verifySessionToken(request.cookies.get('client_session')?.value);
+
   if (
     pathname.startsWith('/login') ||
     pathname.startsWith('/portal-login') ||
@@ -14,22 +16,18 @@ export async function proxy(request) {
     return NextResponse.next();
   }
 
-  // --- CLIENT PORTAL ACCESS ---
   if (pathname.startsWith('/portal')) {
-    const clientCookie = request.cookies.get('client_session');
-    if(!clientCookie) {
-       return NextResponse.redirect(new URL('/portal-login', request.url));
+    if (!clientSession || clientSession.kind !== 'client') {
+      return NextResponse.redirect(new URL('/portal-login', request.url));
     }
+
     return NextResponse.next();
   }
 
-  // --- ADMIN DASHBOARD ACCESS (default everything else) ---
-  const userCookie = request.cookies.get('session_user');
-  if (!userCookie) {
+  if (!adminSession || adminSession.kind !== 'admin') {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // Authorized Admin
   return NextResponse.next();
 }
 

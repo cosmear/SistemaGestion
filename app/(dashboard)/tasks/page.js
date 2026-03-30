@@ -1,22 +1,21 @@
 import { createClient } from '@/utils/supabase/server';
 import KanbanClient from './KanbanClient';
-import { cookies } from 'next/headers';
+import { requireAdminSession } from '@/utils/auth/admin';
+import { DEFAULT_KANBAN_COLUMNS } from '@/utils/constants';
 
 export default async function TasksPage(props) {
-  // En Next.js 15, los searchParams pueden ser promesas
+  const session = await requireAdminSession();
   const searchParams = await props.searchParams;
-  const cookieStore = await cookies();
-  const userName = cookieStore.get('session_user')?.value || 'Guest';
-
-  // Si no se especifica board por URL, el predeterminado es el personal del usuario actual
+  const userName = session.username || 'Admin';
   const targetBoard = searchParams?.board ? String(searchParams.board) : `personal_${userName}`;
-
   const supabase = await createClient();
 
-  // Listamos los clientes activos para popular el dropdown de tableros de clientes
-  const { data: clients } = await supabase.from('clients').select('id, name').eq('status', 'active').order('name');
+  const { data: clients } = await supabase
+    .from('clients')
+    .select('id, name')
+    .eq('status', 'active')
+    .order('name');
 
-  // Traer columnas SÓLO del tablero seleccionado
   let { data: columns, error: colError } = await supabase
     .from('kanban_columns')
     .select('*')
@@ -26,33 +25,29 @@ export default async function TasksPage(props) {
   if (colError) {
     return (
       <div className="p-8 text-center text-red-500 font-medium">
-        Error conectando a Supabase Kanban (Columnas). Asegúrate de tener conexión.
+        Error conectando a Supabase Kanban (columnas). Asegurate de tener conexion.
       </div>
     );
   }
 
-  // Generación lazy de columnas: Si este tablero específico no tiene columnas, créalas
   if (!columns || columns.length === 0) {
-    const defaultCols = [
-      { board_id: targetBoard, title: 'To Do', position: 0 },
-      { board_id: targetBoard, title: 'En Progreso', position: 1 },
-      { board_id: targetBoard, title: 'Terminadas', position: 2 }
-    ];
+    const defaultCols = DEFAULT_KANBAN_COLUMNS.map((column) => ({
+      ...column,
+      board_id: targetBoard,
+    }));
     await supabase.from('kanban_columns').insert(defaultCols);
-    
-    // Obtener nuevamente tras la creación
+
     const res = await supabase
-       .from('kanban_columns')
-       .select('*')
-       .eq('board_id', targetBoard)
-       .order('position', { ascending: true });
+      .from('kanban_columns')
+      .select('*')
+      .eq('board_id', targetBoard)
+      .order('position', { ascending: true });
     columns = res.data || [];
   }
 
-  // Obtener exclusivamente las tareas de este tablero en particular
-  const colIds = columns.map(c => c.id);
+  const colIds = columns.map((column) => column.id);
   let tasks = [];
-  
+
   if (colIds.length > 0) {
     const { data: reqTasks } = await supabase
       .from('kanban_tasks')
@@ -63,13 +58,20 @@ export default async function TasksPage(props) {
     tasks = reqTasks || [];
   }
 
+  const boardVersion = JSON.stringify({
+    board: targetBoard,
+    columns: columns.map((column) => `${column.id}:${column.position}`),
+    tasks: tasks.map((task) => `${task.id}:${task.column_id}:${task.priority || ''}:${task.deadline || ''}`),
+  });
+
   return (
-    <KanbanClient 
-      initialColumns={columns} 
-      initialTasks={tasks} 
-      activeBoard={targetBoard} 
-      userName={userName} 
-      allClients={clients || []} 
+    <KanbanClient
+      key={boardVersion}
+      initialColumns={columns}
+      initialTasks={tasks}
+      activeBoard={targetBoard}
+      userName={userName}
+      allClients={clients || []}
     />
   );
 }

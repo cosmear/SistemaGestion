@@ -10,18 +10,18 @@ export default function PortalLoginForm() {
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const handleSubmit = async (event) => {
+    event.preventDefault()
     setLoading(true)
     setError(null)
-    
-    const formData = new FormData(e.target)
-    const res = await loginClientPortal(formData)
-    
-    if (res.success) {
+
+    const formData = new FormData(event.target)
+    const response = await loginClientPortal(formData)
+
+    if (response.success) {
       router.push('/portal')
     } else {
-      setError(res.error)
+      setError(response.error)
       setLoading(false)
     }
   }
@@ -30,7 +30,7 @@ export default function PortalLoginForm() {
     <form className="space-y-6" onSubmit={handleSubmit}>
       <div>
         <label className="block text-sm font-bold text-gray-700">
-          Email Registrado
+          Email registrado
         </label>
         <div className="mt-1">
           <input
@@ -44,7 +44,7 @@ export default function PortalLoginForm() {
 
       <div>
         <label className="block text-sm font-bold text-gray-700">
-          Contraseña Acceso
+          Contrasena de acceso
         </label>
         <div className="mt-1">
           <input
@@ -58,7 +58,7 @@ export default function PortalLoginForm() {
 
       {error && (
         <div className="bg-red-50 text-red-600 text-sm p-3 rounded-xl border border-red-200 font-bold animate-fade-in flex items-center gap-2 shadow-sm">
-          ❌ {error}
+          Error: {error}
         </div>
       )}
 
@@ -68,7 +68,7 @@ export default function PortalLoginForm() {
           disabled={loading}
           className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-[0_4px_15px_rgba(21,128,61,0.3)] text-sm font-extrabold text-white bg-brand-600 hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-600 transition-all gap-2 items-center disabled:opacity-70 disabled:cursor-not-allowed hover:-translate-y-0.5"
         >
-          {loading ? 'Entrando...' : <>Acceder a tu Panel <SignIn weight="bold" className="text-lg" /></>}
+          {loading ? 'Entrando...' : <>Acceder a tu panel <SignIn weight="bold" className="text-lg" /></>}
         </button>
       </div>
     </form>

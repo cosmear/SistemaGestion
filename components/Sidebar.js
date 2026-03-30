@@ -1,7 +1,19 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { SquaresFour, Users, ListDashes, ChartLineUp, Kanban, CalendarBlank, ClockCounterClockwise, SignOut, Ticket } from '@phosphor-icons/react';
+import {
+  SquaresFour,
+  Users,
+  ListDashes,
+  ChartLineUp,
+  Kanban,
+  CalendarBlank,
+  ClockCounterClockwise,
+  SignOut,
+  Ticket,
+  Receipt,
+} from '@phosphor-icons/react';
+import { logoutUser } from '@/app/auth-actions';
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -14,6 +26,7 @@ export default function Sidebar() {
     { href: '/tasks', icon: Kanban, label: 'Tareas' },
     { href: '/calendar', icon: CalendarBlank, label: 'Calendario' },
     { href: '/tickets', icon: Ticket, label: 'Casos B2B' },
+    { href: '/billing', icon: Receipt, label: 'Cobranzas' },
     { href: '/audit', icon: ClockCounterClockwise, label: 'Historial' },
   ];
 
@@ -56,12 +69,15 @@ export default function Sidebar() {
               U
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-900">Usuario</p>
-              <p className="text-xs text-gray-500">Administrador</p>
+              <p className="text-sm font-medium text-gray-900">Panel interno</p>
+              <p className="text-xs text-gray-500">Operacion</p>
             </div>
           </div>
-          <button className="text-xs text-gray-500 hover:text-red-600 text-left px-2 flex items-center gap-2 transition-colors mt-2">
-            <SignOut weight="regular" /> Cerrar Sesión
+          <button
+            onClick={() => logoutUser()}
+            className="text-xs text-gray-500 hover:text-red-600 text-left px-2 flex items-center gap-2 transition-colors mt-2"
+          >
+            <SignOut weight="regular" /> Cerrar sesion
           </button>
         </div>
       </div>

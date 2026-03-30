@@ -1,9 +1,10 @@
 import { createClient } from '@/utils/supabase/server';
+import { requireAdminSession } from '@/utils/auth/admin';
 
 export default async function AuditPage() {
+  await requireAdminSession();
   const supabase = await createClient();
 
-  // Fetch data directly in the server component
   const { data: logs, error } = await supabase
     .from('audit_logs')
     .select('*')
@@ -14,21 +15,21 @@ export default async function AuditPage() {
       <div className="flex items-center gap-4 mb-6">
         <h3 className="text-lg font-semibold flex-1">Historial de Movimientos</h3>
       </div>
-      
+
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-500 uppercase tracking-wider">
               <th className="py-3 px-6 w-48">Fecha y Hora</th>
               <th className="py-3 px-6 w-32">Usuario</th>
-              <th className="py-3 px-6">Acción Realizada</th>
+              <th className="py-3 px-6">Accion Realizada</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 text-sm">
             {error ? (
               <tr>
                 <td colSpan="3" className="py-4 text-center text-red-500 font-medium">
-                  Error cargando el historial: Asegúrate de haber ejecutado el SQL en Supabase para crear las tablas.
+                  Error cargando el historial. Asegurate de haber ejecutado el SQL de Supabase.
                 </td>
               </tr>
             ) : (!logs || logs.length === 0) ? (
