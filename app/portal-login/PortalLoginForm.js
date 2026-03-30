@@ -1,12 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { SignIn } from '@phosphor-icons/react'
 import { loginClientPortal } from '@/app/portal-actions'
 
 export default function PortalLoginForm() {
-  const router = useRouter()
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
@@ -19,7 +17,7 @@ export default function PortalLoginForm() {
     const response = await loginClientPortal(formData)
 
     if (response.success) {
-      router.push('/portal')
+      window.location.assign('/portal')
     } else {
       setError(response.error)
       setLoading(false)

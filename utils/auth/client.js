@@ -72,7 +72,9 @@ export async function authenticateClientUser(email, password) {
 }
 
 export async function createClientSession(user) {
-  return persistSessionCookie(CLIENT_COOKIE, buildClientSessionPayload(user), {
+  const payload = user?.kind === 'client' ? user : buildClientSessionPayload(user);
+
+  return persistSessionCookie(CLIENT_COOKIE, payload, {
     maxAge: 60 * 60 * 24 * 7,
   });
 }

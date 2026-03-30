@@ -27,6 +27,27 @@ function normalizeTicketPriority(priority) {
   return 'medium'
 }
 
+function normalizeTaskPriority(priority) {
+  if (['high', 'medium', 'low'].includes(priority)) {
+    return priority
+  }
+
+  return 'low'
+}
+
+function normalizeTaskSubtasks(subtasks) {
+  if (!Array.isArray(subtasks)) {
+    return []
+  }
+
+  return subtasks
+    .map((subtask) => ({
+      text: String(subtask?.text || '').trim(),
+      done: Boolean(subtask?.done),
+    }))
+    .filter((subtask) => subtask.text.length > 0)
+}
+
 function normalizeClientPayload(data) {
   return {
     name: String(data.name || '').trim(),
@@ -532,24 +553,34 @@ export async function addKanbanTask(columnId, title, priority = 'low', deadline 
   const session = await requireAdminSession()
   const actorName = actorNameFromSession(session)
   const supabase = await createClient()
+  const normalizedTitle = String(title || '').trim()
+
+  if (!normalizedTitle) {
+    return { success: false, error: 'El titulo es obligatorio.' }
+  }
+
   const payload = {
     column_id: columnId,
-    title,
-    priority,
-    deadline,
+    title: normalizedTitle,
+    priority: normalizeTaskPriority(priority),
+    deadline: trimValue(deadline),
     linked_ticket_id: options.linkedTicketId || null,
+    subtasks: normalizeTaskSubtasks(options.subtasks),
   }
 
-  const { error } = await supabase.from('kanban_tasks').insert([payload])
+  const { data: createdTask, error } = await supabase
+    .from('kanban_tasks')
+    .insert([payload])
+    .select('*')
+    .single()
 
   if (!error) {
-    await logAudit(`Agrego la tarea "${title}"`, actorName)
+    await logAudit(`Agrego la tarea "${normalizedTitle}"`, actorName)
   }
 
-  revalidatePath('/tasks')
-  revalidatePath('/calendar')
+  revalidateAdminShell()
 
-  return { success: !error, error: error?.message }
+  return { success: !error, error: error?.message, task: createdTask || null }
 }
 
 export async function updateTaskColumn(taskId, title, newColumnId) {
@@ -562,9 +593,57 @@ export async function updateTaskColumn(taskId, title, newColumnId) {
     await logAudit(`Movio la tarea "${title}"`, actorName)
   }
 
-  revalidatePath('/tasks')
+  revalidateAdminShell()
 
   return { success: !error, error: error?.message }
+}
+
+export async function updateKanbanTask(taskId, updates = {}) {
+  const session = await requireAdminSession()
+  const actorName = actorNameFromSession(session)
+  const supabase = await createClient()
+  const payload = {}
+
+  if ('title' in updates) {
+    const normalizedTitle = String(updates.title || '').trim()
+
+    if (!normalizedTitle) {
+      return { success: false, error: 'El titulo es obligatorio.' }
+    }
+
+    payload.title = normalizedTitle
+  }
+
+  if ('priority' in updates) {
+    payload.priority = normalizeTaskPriority(updates.priority)
+  }
+
+  if ('deadline' in updates) {
+    payload.deadline = trimValue(updates.deadline)
+  }
+
+  if ('subtasks' in updates) {
+    payload.subtasks = normalizeTaskSubtasks(updates.subtasks)
+  }
+
+  if (Object.keys(payload).length === 0) {
+    return { success: false, error: 'No hay cambios para guardar.' }
+  }
+
+  const { data: updatedTask, error } = await supabase
+    .from('kanban_tasks')
+    .update(payload)
+    .eq('id', taskId)
+    .select('*')
+    .single()
+
+  if (!error && updatedTask) {
+    await logAudit(`Actualizo la tarea "${updatedTask.title}"`, actorName)
+  }
+
+  revalidateAdminShell()
+
+  return { success: !error, error: error?.message, task: updatedTask || null }
 }
 
 export async function deleteKanbanTask(taskId, title) {
@@ -577,8 +656,7 @@ export async function deleteKanbanTask(taskId, title) {
     await logAudit(`Elimino la tarea "${title}"`, actorName)
   }
 
-  revalidatePath('/tasks')
-  revalidatePath('/calendar')
+  revalidateAdminShell()
 
   return { success: !error, error: error?.message }
 }

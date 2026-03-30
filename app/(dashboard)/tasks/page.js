@@ -61,7 +61,13 @@ export default async function TasksPage(props) {
   const boardVersion = JSON.stringify({
     board: targetBoard,
     columns: columns.map((column) => `${column.id}:${column.position}`),
-    tasks: tasks.map((task) => `${task.id}:${task.column_id}:${task.priority || ''}:${task.deadline || ''}`),
+    tasks: tasks.map((task) => {
+      const checklistStamp = Array.isArray(task.subtasks)
+        ? task.subtasks.map((subtask) => `${subtask.text || ''}:${subtask.done ? 1 : 0}`).join('|')
+        : ''
+
+      return `${task.id}:${task.column_id}:${task.title || ''}:${task.priority || ''}:${task.deadline || ''}:${checklistStamp}`
+    }),
   });
 
   return (

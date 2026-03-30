@@ -89,7 +89,9 @@ export async function authenticateAdminUser(username, password) {
 }
 
 export async function createAdminSession(user) {
-  return persistSessionCookie(ADMIN_COOKIE, buildAdminSessionPayload(user), {
+  const payload = user?.kind === 'admin' ? user : buildAdminSessionPayload(user);
+
+  return persistSessionCookie(ADMIN_COOKIE, payload, {
     maxAge: 60 * 60 * 12,
   });
 }

@@ -66,7 +66,8 @@ create table if not exists ticket_comments (
 create index if not exists idx_ticket_comments_ticket_id on ticket_comments(ticket_id, created_at desc);
 
 alter table kanban_tasks
-  add column if not exists linked_ticket_id uuid references tickets(id) on delete set null;
+  add column if not exists linked_ticket_id uuid references tickets(id) on delete set null,
+  add column if not exists subtasks jsonb not null default '[]'::jsonb;
 
 alter table cashflow
   add column if not exists source_type text,

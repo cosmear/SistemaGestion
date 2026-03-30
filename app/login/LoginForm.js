@@ -1,12 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { SignIn } from '@phosphor-icons/react'
 import { loginUser } from '@/app/auth-actions'
 
 export default function LoginForm() {
-  const router = useRouter()
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
@@ -19,7 +17,7 @@ export default function LoginForm() {
     const response = await loginUser(formData)
 
     if (response.success) {
-      router.push('/')
+      window.location.assign('/')
     } else {
       setError(response.error)
       setLoading(false)
