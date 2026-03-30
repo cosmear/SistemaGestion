@@ -305,8 +305,8 @@ export default function PortalDashboardClient({ clientData, initialTickets, init
       <div id="receipt-template" style={{ display: 'none', width: '800px', padding: '40px', backgroundColor: '#ffffff', color: '#111827', fontFamily: 'sans-serif' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #e5e7eb', paddingBottom: '20px', marginBottom: '30px' }}>
               <div>
-                  <h1 style={{ fontSize: '32px', fontWeight: '900', margin: 0, color: '#16a34a' }}>Loop Smith</h1>
-                  <p style={{ fontSize: '14px', color: '#6b7280', margin: '4px 0 0 0' }}>Servicios Digitales y Desarrollo Web</p>
+                  <h1 style={{ fontSize: '32px', fontWeight: '900', margin: 0, color: '#16a34a' }}>Faro</h1>
+                  <p style={{ fontSize: '14px', color: '#6b7280', margin: '4px 0 0 0' }}>Desarrollado por Loopsmith</p>
               </div>
               <div style={{ textAlign: 'right' }}>
                   <h2 style={{ fontSize: '24px', fontWeight: '800', margin: 0 }}>COMPROBANTE B2B</h2>

@@ -7,10 +7,10 @@ export default function LoginPage() {
       
       <div className="sm:mx-auto sm:w-full sm:max-w-md z-10 animate-fade-in">
         <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
-          Loop Smith Management
+          Faro
         </h2>
         <p className="mt-2 text-center text-sm text-gray-300">
-          Iniciar sesión para acceder al panel de administración
+          Desarrollado por Loopsmith · Iniciar sesión para acceder al panel de administración
         </p>
       </div>
 

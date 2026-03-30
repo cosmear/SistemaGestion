@@ -802,7 +802,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md overflow-hidden rounded-[32px] border-t-4 border-indigo-600 bg-white shadow-2xl animate-fade-in">
             <div className="border-b border-gray-100 bg-indigo-50/40 p-6">
-              <h3 className="text-2xl font-black tracking-tight text-gray-900">Portal B2B</h3>
+              <h3 className="text-2xl font-black tracking-tight text-gray-900">Faro Portal B2B</h3>
               <p className="mt-2 text-sm font-medium text-gray-500">
                 Configura el acceso de <b>{credModal.client.name}</b> a su portal privado.
               </p>

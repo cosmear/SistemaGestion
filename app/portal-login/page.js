@@ -11,7 +11,7 @@ export default function PortalLoginPage() {
            <UserCircle weight="fill" className="text-4xl" />
         </div>
         <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900 tracking-tight">
-          Portal B2B
+          Faro Portal B2B
         </h2>
         <p className="mt-2 text-center text-sm text-gray-700 font-bold bg-white/50 px-4 py-1 rounded-full shadow-sm">
           Accede usando las credenciales proveídas por la agencia

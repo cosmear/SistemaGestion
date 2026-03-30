@@ -34,11 +34,12 @@ export default function Sidebar() {
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-full shadow-sm z-10 transition-all duration-300 relative shrink-0">
       <div className="p-6 flex items-center gap-3 border-b border-gray-100">
         <div className="w-8 h-8 rounded-lg bg-green-500 text-white flex items-center justify-center font-bold text-xl shadow-md">
-          L
+          F
         </div>
-        <h1 className="text-xl font-bold tracking-tight text-gray-900">
-          Loop Smith
-        </h1>
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-gray-900">Faro</h1>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Desarrollado por Loopsmith</p>
+        </div>
       </div>
 
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">

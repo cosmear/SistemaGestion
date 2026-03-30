@@ -13,7 +13,7 @@ export default function PortalTopBar({ clientName }) {
                <UserCircle weight="fill" className="text-white text-2xl" />
              </div>
              <div>
-               <h1 className="text-xl font-extrabold text-gray-900 tracking-tight leading-none mb-0.5">Portal B2B</h1>
+               <h1 className="text-xl font-extrabold text-gray-900 tracking-tight leading-none mb-0.5">Faro Portal B2B</h1>
                <p className="text-xs text-brand-600 font-bold uppercase tracking-widest">{clientName}</p>
              </div>
           </div>
