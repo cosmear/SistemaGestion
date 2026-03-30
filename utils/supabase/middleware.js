@@ -33,5 +33,6 @@ export const createClient = (request) => {
     },
   );
 
-  return { supabase, supabaseResponse }
+  // MUST return a Response instance for the Proxy
+  return supabaseResponse;
 };

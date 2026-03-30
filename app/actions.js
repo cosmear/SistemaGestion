@@ -102,3 +102,59 @@ export async function updateClientStatus(id, newStatus, clientName) {
   revalidatePath('/clients')
   return { success: !error }
 }
+
+// --- BUDGET ACTIONS ---
+export async function addBudgetItem(type, name) {
+  const supabase = await createClient()
+  const { error } = await supabase.from('budget_items').insert([{ type, name }])
+  if (!error) await logAudit(`Agregó fila de presupuesto: ${name} (${type})`)
+  revalidatePath('/budget')
+  return { success: !error }
+}
+
+export async function removeBudgetItem(id, name) {
+  const supabase = await createClient()
+  const { error } = await supabase.from('budget_items').delete().eq('id', id)
+  if (!error) await logAudit(`Eliminó fila de presupuesto: ${name}`)
+  revalidatePath('/budget')
+  return { success: !error }
+}
+
+export async function updateBudgetCell(id, monthIndex, value) {
+  const supabase = await createClient()
+  const valToSave = parseFloat(value) || 0
+  const colName = `m${monthIndex}`
+
+  const { error } = await supabase.from('budget_items').update({ [colName]: valToSave }).eq('id', id)
+  // Nota: no loguearemos cada teclazo individual del budget para no inundar el audit
+  revalidatePath('/budget')
+  return { success: !error }
+}
+
+// --- KANBAN ACTIONS ---
+export async function addKanbanTask(columnId, title, priority='low', deadline=null) {
+  const supabase = await createClient()
+  const payload = { column_id: columnId, title, priority, deadline }
+  const { error } = await supabase.from('kanban_tasks').insert([payload])
+  if (!error) await logAudit(`Agregó la tarea: "${title}"`)
+  revalidatePath('/tasks')
+  revalidatePath('/calendar')
+  return { success: !error }
+}
+
+export async function updateTaskColumn(taskId, title, newColumnId) {
+  const supabase = await createClient()
+  const { error } = await supabase.from('kanban_tasks').update({ column_id: newColumnId }).eq('id', taskId)
+  if (!error) await logAudit(`Movió la tarea "${title}"`)
+  revalidatePath('/tasks')
+  return { success: !error }
+}
+
+export async function deleteKanbanTask(taskId, title) {
+  const supabase = await createClient()
+  const { error } = await supabase.from('kanban_tasks').delete().eq('id', taskId)
+  if (!error) await logAudit(`Eliminó la tarea: "${title}"`)
+  revalidatePath('/tasks')
+  revalidatePath('/calendar')
+  return { success: !error }
+}
