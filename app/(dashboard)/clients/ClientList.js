@@ -8,6 +8,7 @@ import {
   HandCoins,
   Key,
   MagnifyingGlass,
+  PencilSimple,
   Plus,
   Trash,
   UserCircle,
@@ -18,6 +19,7 @@ import {
   deleteClientCredential,
   insertClient,
   setClientCredentials,
+  updateClient,
   updateClientStatus,
 } from '@/app/actions';
 
@@ -31,7 +33,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
   const router = useRouter();
   const [clients, setClients] = useState(initialClients || []);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showModal, setShowModal] = useState(false);
+  const [clientModal, setClientModal] = useState({ open: false, mode: 'create', client: null });
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [deletingClientId, setDeletingClientId] = useState(null);
@@ -76,6 +78,8 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
   const totalMrr = activeClients.reduce((total, client) => total + Number(client.pack_monthly_fee || 0), 0);
   const openTicketsCount = (clientTickets || []).filter((ticket) => ticket.status === 'open').length;
   const portalEnabledCount = (clientCredentials || []).length;
+  const isEditMode = clientModal.mode === 'edit' && Boolean(clientModal.client);
+  const modalClient = clientModal.client;
 
   const normalizedSearch = searchTerm.trim().toLowerCase();
   const visibleClients = clients.filter((client) => {
@@ -99,7 +103,20 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
     router.refresh();
   };
 
-  const handleCreateClient = async (event) => {
+  const openCreateModal = () => {
+    setClientModal({ open: true, mode: 'create', client: null });
+  };
+
+  const openEditModal = (client) => {
+    setClientModal({ open: true, mode: 'edit', client });
+  };
+
+  const closeClientModal = () => {
+    setClientModal({ open: false, mode: 'create', client: null });
+    setIsSubmitting(false);
+  };
+
+  const handleClientSubmit = async (event) => {
     event.preventDefault();
     setIsSubmitting(true);
 
@@ -113,16 +130,18 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
       phone_whatsapp: formData.get('phone_whatsapp') || null,
     };
 
-    const result = await insertClient(data);
+    const result =
+      clientModal.mode === 'edit' && clientModal.client
+        ? await updateClient(clientModal.client.id, data)
+        : await insertClient(data);
 
     if (result.success) {
-      setShowModal(false);
-      setIsSubmitting(false);
+      closeClientModal();
       refreshData();
       return;
     }
 
-    alert('Error guardando el cliente.');
+    alert(result.error || 'Error guardando el cliente.');
     setIsSubmitting(false);
   };
 
@@ -229,7 +248,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
         </div>
 
         <button
-          onClick={() => setShowModal(true)}
+          onClick={openCreateModal}
           className="inline-flex items-center gap-2 rounded-2xl bg-brand-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-brand-200 transition-all hover:-translate-y-0.5 hover:bg-brand-700"
         >
           <Plus weight="bold" />
@@ -421,6 +440,14 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
                   <button
+                    onClick={() => openEditModal(client)}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-200"
+                  >
+                    <PencilSimple weight="bold" />
+                    Editar ficha
+                  </button>
+
+                  <button
                     onClick={() => openCredModal(client)}
                     className={`rounded-2xl px-4 py-3 text-sm font-bold transition-colors ${
                       credentials
@@ -458,17 +485,25 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
         </div>
       )}
 
-      {showModal && (
+      {clientModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm">
           <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[32px] bg-white shadow-2xl custom-scrollbar animate-fade-in">
             <div className="border-b border-gray-100 bg-gray-50 p-6">
-              <h3 className="text-2xl font-black tracking-tight text-gray-900">Nuevo cliente</h3>
+              <h3 className="text-2xl font-black tracking-tight text-gray-900">
+                {isEditMode ? 'Editar cliente' : 'Nuevo cliente'}
+              </h3>
               <p className="mt-2 text-sm font-medium text-gray-500">
-                Crea la ficha comercial y, si corresponde, deja listo su fee de desarrollo y mensualidad.
+                {isEditMode
+                  ? 'Actualiza los datos comerciales del cliente desde este modal.'
+                  : 'Crea la ficha comercial y, si corresponde, deja listo su fee de desarrollo y mensualidad.'}
               </p>
             </div>
 
-            <form onSubmit={handleCreateClient} className="space-y-6 p-6">
+            <form
+              key={modalClient?.id || 'new-client'}
+              onSubmit={handleClientSubmit}
+              className="space-y-6 p-6"
+            >
               <div className="space-y-4">
                 <h4 className="border-b border-brand-100 pb-2 text-xs font-black uppercase tracking-[0.2em] text-brand-600">
                   Identidad
@@ -480,6 +515,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
                     name="name"
                     required
                     placeholder="Ej: Mi marca"
+                    defaultValue={modalClient?.name || ''}
                     className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm font-medium text-gray-800 outline-none transition-all focus:border-brand-300 focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
@@ -491,6 +527,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
                       type="text"
                       name="website_url"
                       placeholder="ej: empresa.com"
+                      defaultValue={modalClient?.website_url || ''}
                       className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm font-medium text-gray-800 outline-none transition-all focus:border-brand-300 focus:ring-2 focus:ring-brand-500"
                     />
                   </div>
@@ -500,6 +537,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
                       type="text"
                       name="phone_whatsapp"
                       placeholder="+54911..."
+                      defaultValue={modalClient?.phone_whatsapp || ''}
                       className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm font-medium text-gray-800 outline-none transition-all focus:border-brand-300 focus:ring-2 focus:ring-brand-500"
                     />
                   </div>
@@ -515,7 +553,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
                   <label className="mb-1.5 block text-sm font-bold text-gray-700">Tipo de pack</label>
                   <select
                     name="pack_type"
-                    defaultValue="custom"
+                    defaultValue={modalClient?.pack_type || 'custom'}
                     className="w-full rounded-2xl border border-gray-300 bg-gray-50 px-4 py-3 text-sm font-bold text-gray-700 outline-none transition-all focus:border-brand-300 focus:ring-2 focus:ring-brand-500"
                   >
                     <option value="1">Estandarizado #1</option>
@@ -535,7 +573,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
                     <input
                       type="number"
                       name="pack_dev_fee"
-                      defaultValue="0"
+                      defaultValue={modalClient?.pack_dev_fee ?? '0'}
                       className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm font-bold text-gray-800 outline-none transition-all focus:border-brand-300 focus:ring-2 focus:ring-brand-500"
                     />
                   </div>
@@ -547,7 +585,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
                     <input
                       type="number"
                       name="pack_monthly_fee"
-                      defaultValue="0"
+                      defaultValue={modalClient?.pack_monthly_fee ?? '0'}
                       className="w-full rounded-2xl border border-brand-300 bg-brand-50 px-4 py-3 text-sm font-bold text-brand-700 outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-500"
                     />
                   </div>
@@ -557,7 +595,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
               <div className="flex justify-end gap-3 border-t border-gray-100 pt-6">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={closeClientModal}
                   className="rounded-2xl px-5 py-3 text-sm font-bold text-gray-600 transition-colors hover:bg-gray-100"
                 >
                   Cancelar
@@ -567,7 +605,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
                   disabled={isSubmitting}
                   className="rounded-2xl bg-brand-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-brand-200 transition-colors hover:bg-brand-700 disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Guardando...' : 'Crear cliente'}
+                  {isSubmitting ? 'Guardando...' : isEditMode ? 'Guardar cambios' : 'Crear cliente'}
                 </button>
               </div>
             </form>

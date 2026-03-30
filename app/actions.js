@@ -92,6 +92,34 @@ export async function insertClient(data) {
   return { success: !error }
 }
 
+export async function updateClient(clientId, data) {
+  const supabase = await createClient()
+  const payload = {
+    name: data.name,
+    pack_type: data.pack_type || '1',
+    pack_dev_fee: data.pack_dev_fee || 0,
+    pack_monthly_fee: data.pack_monthly_fee || 0,
+    website_url: data.website_url,
+    phone_whatsapp: data.phone_whatsapp,
+  }
+
+  const { error } = await supabase
+    .from('clients')
+    .update(payload)
+    .eq('id', clientId)
+
+  if (!error) {
+    await logAudit(`Actualizo la ficha del cliente "${data.name}"`)
+  }
+
+  revalidatePath('/clients')
+  revalidatePath('/tasks')
+  revalidatePath('/')
+  revalidatePath('/portal')
+
+  return { success: !error, error: error?.message }
+}
+
 export async function updateClientStatus(id, newStatus, clientName) {
   const supabase = await createClient()
   const { error } = await supabase.from('clients').update({ status: newStatus }).eq('id', id)
@@ -102,6 +130,8 @@ export async function updateClientStatus(id, newStatus, clientName) {
   }
   
   revalidatePath('/clients')
+  revalidatePath('/tasks')
+  revalidatePath('/')
   return { success: !error }
 }
 
