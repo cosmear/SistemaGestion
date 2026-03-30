@@ -4,8 +4,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "Loop Smith Management",
-  description: "Next.js Application for Loop Smith Management",
+  title: "Faro",
+  description: "Faro, desarrollado por Loopsmith",
 };
 
 export default function RootLayout({ children }) {

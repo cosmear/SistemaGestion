@@ -15,7 +15,7 @@ export default function Header({ userName }) {
       case '/tasks': return 'Gestión de Tareas';
       case '/calendar': return 'Calendario';
       case '/audit': return 'Historial de Auditoría';
-      default: return 'Sistema de Gestión';
+      default: return 'Faro';
     }
   };
 
