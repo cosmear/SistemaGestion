@@ -132,6 +132,77 @@ export async function deleteClientCredential(clientId) {
   return { success: !error };
 }
 
+export async function deleteClient(clientId, clientName) {
+  const supabase = await createClient()
+  const boardId = `client_${clientId}`
+
+  const { data: boardColumns, error: boardColumnsError } = await supabase
+    .from('kanban_columns')
+    .select('id')
+    .eq('board_id', boardId)
+
+  if (boardColumnsError) {
+    return { success: false, error: boardColumnsError.message }
+  }
+
+  const columnIds = (boardColumns || []).map((column) => column.id)
+
+  if (columnIds.length > 0) {
+    const { error: boardTasksError } = await supabase
+      .from('kanban_tasks')
+      .delete()
+      .in('column_id', columnIds)
+
+    if (boardTasksError) {
+      return { success: false, error: boardTasksError.message }
+    }
+  }
+
+  const { error: boardCleanupError } = await supabase
+    .from('kanban_columns')
+    .delete()
+    .eq('board_id', boardId)
+
+  if (boardCleanupError) {
+    return { success: false, error: boardCleanupError.message }
+  }
+
+  const { error: credentialsError } = await supabase
+    .from('client_users')
+    .delete()
+    .eq('client_id', clientId)
+
+  if (credentialsError) {
+    return { success: false, error: credentialsError.message }
+  }
+
+  const { error: ticketsError } = await supabase
+    .from('tickets')
+    .delete()
+    .eq('client_id', clientId)
+
+  if (ticketsError) {
+    return { success: false, error: ticketsError.message }
+  }
+
+  const { error } = await supabase
+    .from('clients')
+    .delete()
+    .eq('id', clientId)
+
+  if (!error) {
+    await logAudit(`Elimino el cliente "${clientName}" y limpio sus accesos/tablero`)
+  }
+
+  revalidatePath('/clients')
+  revalidatePath('/tasks')
+  revalidatePath('/tickets')
+  revalidatePath('/calendar')
+  revalidatePath('/')
+
+  return { success: !error, error: error?.message }
+}
+
 // --- TICKETS ACTIONS ---
 export async function updateTicketStatus(ticketId, newStatus) {
   const supabase = await createClient();
