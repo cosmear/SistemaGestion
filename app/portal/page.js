@@ -44,6 +44,14 @@ export default async function PortalPage() {
       .order('created_at', { ascending: false }),
   ]);
 
+  if (ticketsResult.error || invoicesResult.error) {
+    return (
+      <div className="p-8 text-center text-red-500 font-bold">
+        Error cargando el portal B2B. Reintenta en unos segundos.
+      </div>
+    );
+  }
+
   const tickets = (ticketsResult.data || []).map((ticket) => ({
     ...ticket,
     ticket_comments: (ticket.ticket_comments || []).filter((comment) => comment.visibility === 'public'),
