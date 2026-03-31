@@ -13,6 +13,7 @@ import {
 } from '@phosphor-icons/react';
 import jsPDF from 'jspdf';
 import { submitClientTicket, submitClientTicketComment } from '@/app/portal-actions';
+import { runServerAction } from '@/utils/client/runServerAction';
 import { formatPeriodLabel } from '@/utils/billing';
 import { getInvoiceStatusMeta, getTicketPriorityMeta, getTicketStatusMeta } from '@/utils/constants';
 
@@ -116,7 +117,7 @@ export default function PortalDashboardClient({ clientData, initialTickets, init
     const formData = new FormData(event.target);
     const title = formData.get('title');
     const description = formData.get('description');
-    const result = await submitClientTicket(title, description);
+    const result = await runServerAction(submitClientTicket, title, description);
 
     if (!result.success) {
       setTicketBanner({
@@ -159,7 +160,7 @@ export default function PortalDashboardClient({ clientData, initialTickets, init
       [ticketId]: null,
     }));
 
-    const result = await submitClientTicketComment(ticketId, message);
+    const result = await runServerAction(submitClientTicketComment, ticketId, message);
 
     if (!result.success) {
       setCommentBanners((current) => ({

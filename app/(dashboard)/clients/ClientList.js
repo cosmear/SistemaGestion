@@ -25,6 +25,7 @@ import {
   updateClient,
   updateClientStatus,
 } from '@/app/actions';
+import { runServerAction } from '@/utils/client/runServerAction';
 import { CLIENT_ONBOARDING_OPTIONS, getOnboardingMeta } from '@/utils/constants';
 
 const STATUS_FILTERS = [
@@ -167,8 +168,8 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
 
     const result =
       clientModal.mode === 'edit' && clientModal.client
-        ? await updateClient(clientModal.client.id, data)
-        : await insertClient(data);
+        ? await runServerAction(updateClient, clientModal.client.id, data)
+        : await runServerAction(insertClient, data);
 
     if (result.success) {
       closeClientModal();
@@ -187,7 +188,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
       currentClients.map((client) => (client.id === id ? { ...client, status: newStatus } : client))
     );
 
-    const result = await updateClientStatus(id, newStatus, name);
+    const result = await runServerAction(updateClientStatus, id, newStatus, name);
 
     if (!result.success) {
       setClients((currentClients) =>
@@ -212,7 +213,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
 
     const email = event.target.email.value;
     const password = event.target.password.value;
-    const result = await setClientCredentials(credModal.client.id, email, password);
+    const result = await runServerAction(setClientCredentials, credModal.client.id, email, password);
 
     if (result.success) {
       setCredModal({ open: false, client: null, currentCred: null });
@@ -230,7 +231,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
       return;
     }
 
-    const result = await deleteClientCredential(clientId);
+    const result = await runServerAction(deleteClientCredential, clientId);
 
     if (!result.success) {
       alert('No se pudo eliminar el acceso del cliente.');
@@ -254,7 +255,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
     setDeletingClientId(clientId);
     setClients((currentClients) => currentClients.filter((client) => client.id !== clientId));
 
-    const result = await deleteClient(clientId, clientName);
+    const result = await runServerAction(deleteClient, clientId, clientName);
 
     if (!result.success) {
       setClients(previousClients);

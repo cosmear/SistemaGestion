@@ -18,6 +18,7 @@ import {
   generateMonthlyInvoices,
   updateInvoiceStatus,
 } from '@/app/actions';
+import { runServerAction } from '@/utils/client/runServerAction';
 import { formatPeriodLabel } from '@/utils/billing';
 import { getInvoiceStatusMeta, INVOICE_STATUS_OPTIONS } from '@/utils/constants';
 
@@ -89,7 +90,7 @@ export default function BillingClient({ initialInvoices, activeClients, defaultP
     setIsSubmitting(true);
 
     const formData = new FormData(event.target);
-    const result = await createInvoice({
+    const result = await runServerAction(createInvoice, {
       clientId: formData.get('client_id'),
       periodKey: formData.get('period_key'),
       amount: Number(formData.get('amount') || 0),
@@ -113,7 +114,8 @@ export default function BillingClient({ initialInvoices, activeClients, defaultP
     setIsSubmitting(true);
 
     const formData = new FormData(event.target);
-    const result = await generateMonthlyInvoices(
+    const result = await runServerAction(
+      generateMonthlyInvoices,
       formData.get('period_key'),
       formData.get('due_date') || null
     );
@@ -130,7 +132,7 @@ export default function BillingClient({ initialInvoices, activeClients, defaultP
   };
 
   const handleStatusChange = async (invoiceId, nextStatus) => {
-    const result = await updateInvoiceStatus(invoiceId, nextStatus);
+    const result = await runServerAction(updateInvoiceStatus, invoiceId, nextStatus);
 
     if (!result.success) {
       alert(result.error || 'No se pudo actualizar el estado.');
@@ -145,7 +147,7 @@ export default function BillingClient({ initialInvoices, activeClients, defaultP
       return;
     }
 
-    const result = await deleteInvoice(invoiceId);
+    const result = await runServerAction(deleteInvoice, invoiceId);
 
     if (!result.success) {
       alert(result.error || 'No se pudo eliminar la factura.');

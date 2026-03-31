@@ -14,6 +14,7 @@ import {
   UserCircle,
 } from '@phosphor-icons/react';
 import { addTicketComment, convertTicketToTask, updateTicketDetails } from '@/app/actions';
+import { runServerAction } from '@/utils/client/runServerAction';
 import {
   getTicketPriorityMeta,
   getTicketStatusMeta,
@@ -53,7 +54,7 @@ export default function TicketsClient({ initialTickets }) {
 
   const handleFieldUpdate = async (ticketId, updates) => {
     patchTicketLocal(ticketId, updates);
-    const result = await updateTicketDetails(ticketId, updates);
+    const result = await runServerAction(updateTicketDetails, ticketId, updates);
 
     if (!result.success) {
       alert(result.error || 'No se pudo actualizar el ticket.');
@@ -69,7 +70,7 @@ export default function TicketsClient({ initialTickets }) {
     }
 
     setIsCommentSubmitting(true);
-    const result = await addTicketComment(selectedTicket.id, commentMessage, commentVisibility);
+    const result = await runServerAction(addTicketComment, selectedTicket.id, commentMessage, commentVisibility);
 
     if (!result.success) {
       alert(result.error || 'No se pudo guardar el comentario.');
@@ -85,7 +86,7 @@ export default function TicketsClient({ initialTickets }) {
 
   const handleConvert = async (ticketId) => {
     setIsConverting(true);
-    const result = await convertTicketToTask(ticketId);
+    const result = await runServerAction(convertTicketToTask, ticketId);
 
     if (!result.success) {
       alert(result.error || 'No se pudo convertir el ticket en tarea.');

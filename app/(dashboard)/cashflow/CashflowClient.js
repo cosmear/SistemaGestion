@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, Trash, X, Wallet, TrendUp, TrendDown, MagnifyingGlass, Funnel } from '@phosphor-icons/react';
 import { addTransaction, deleteTransaction } from '@/app/actions';
+import { runServerAction } from '@/utils/client/runServerAction';
 
 export default function CashflowClient({ transactions, totalIn, totalOut, balance }) {
   const [modalType, setModalType] = useState(null); // 'income' or 'expense'
@@ -14,14 +15,14 @@ export default function CashflowClient({ transactions, totalIn, totalOut, balanc
     e.preventDefault();
     setIsSubmitting(true);
     const formData = new FormData(e.target);
-    await addTransaction(formData);
+    await runServerAction(addTransaction, formData);
     setIsSubmitting(false);
     setModalType(null); // close modal
   }
 
   const handleDelete = async (id, desc) => {
     if(window.confirm('¿Seguro quieres eliminar esta transacción?')) {
-      await deleteTransaction(id, desc);
+      await runServerAction(deleteTransaction, id, desc);
     }
   }
 

@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Plus, Trash, X, ChartLineUp, HandDeposit, HandWithdraw, Coins } from '@phosphor-icons/react';
 import { addBudgetItem, removeBudgetItem, updateBudgetCell } from '@/app/actions';
+import { runServerAction } from '@/utils/client/runServerAction';
 
 export default function BudgetClient({ items }) {
   const [showModal, setShowModal] = useState(null); // 'income' or 'expense'
@@ -50,19 +51,19 @@ export default function BudgetClient({ items }) {
     e.preventDefault();
     setIsSubmitting(true);
     const name = e.target.name.value;
-    await addBudgetItem(showModal, name);
+    await runServerAction(addBudgetItem, showModal, name);
     setIsSubmitting(false);
     setShowModal(null);
   };
 
   const handleRemove = async (id, name) => {
     if (window.confirm(`¿Seguro quieres eliminar la fila contable "${name}"?`)) {
-      await removeBudgetItem(id, name);
+      await runServerAction(removeBudgetItem, id, name);
     }
   };
 
   const handleCellBlur = async (id, monthIndex, value) => {
-    await updateBudgetCell(id, monthIndex, value);
+    await runServerAction(updateBudgetCell, id, monthIndex, value);
   };
 
   const renderTable = (title, list, type, totals, grandTotal, colorTheme, extraRows = null) => {

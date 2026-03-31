@@ -20,6 +20,7 @@ import {
   updateKanbanTask,
   updateTaskColumn,
 } from '@/app/actions';
+import { runServerAction } from '@/utils/client/runServerAction';
 
 function buildEmptyTaskDraft() {
   return {
@@ -210,7 +211,7 @@ export default function KanbanClient({ initialColumns, initialTasks, activeBoard
         : currentTask
     )));
 
-    const response = await updateTaskColumn(taskId, task.title, columnId);
+    const response = await runServerAction(updateTaskColumn, taskId, task.title, columnId);
 
     if (!response.success) {
       setTasks(previousTasks);
@@ -227,7 +228,7 @@ export default function KanbanClient({ initialColumns, initialTasks, activeBoard
     setBoardError(null);
     setTasks((current) => current.filter((task) => task.id !== taskId));
 
-    const response = await deleteKanbanTask(taskId, title);
+    const response = await runServerAction(deleteKanbanTask, taskId, title);
 
     if (!response.success) {
       setTasks(previousTasks);
@@ -258,11 +259,18 @@ export default function KanbanClient({ initialColumns, initialTasks, activeBoard
     let response;
 
     if (modalState?.type === 'create') {
-      response = await addKanbanTask(modalState.columnId, payload.title, payload.priority, payload.deadline, {
-        subtasks: payload.subtasks,
-      });
+      response = await runServerAction(
+        addKanbanTask,
+        modalState.columnId,
+        payload.title,
+        payload.priority,
+        payload.deadline,
+        {
+          subtasks: payload.subtasks,
+        }
+      );
     } else {
-      response = await updateKanbanTask(modalState?.taskId, payload);
+      response = await runServerAction(updateKanbanTask, modalState?.taskId, payload);
     }
 
     if (response?.success && response.task) {

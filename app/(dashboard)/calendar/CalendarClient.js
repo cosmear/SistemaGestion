@@ -6,6 +6,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { CalendarBlank, Plus, X, Handshake, BellRinging, Trash } from '@phosphor-icons/react';
 import { addCalendarEvent, deleteCalendarEvent } from '@/app/actions';
+import { runServerAction } from '@/utils/client/runServerAction';
 
 export default function CalendarClient({ events }) {
   const [showModal, setShowModal] = useState(false);
@@ -22,7 +23,11 @@ export default function CalendarClient({ events }) {
     if (isEvent) {
         const confirmDelete = window.confirm(`📆 Evento Proyectado\n\n${info.event.title}\nInicia: ${info.event.start.toLocaleString('es-AR')}\n\n¿Deseas ELIMINAR este evento agendado?`);
         if(confirmDelete) {
-           await deleteCalendarEvent(info.event.extendedProps.originalId, info.event.extendedProps.originalTitle);
+           await runServerAction(
+             deleteCalendarEvent,
+             info.event.extendedProps.originalId,
+             info.event.extendedProps.originalTitle
+           );
         }
     }
   };
@@ -37,7 +42,8 @@ export default function CalendarClient({ events }) {
      const timeInput = formData.get('time');
      const dateStr = timeInput ? `${dateInput}T${timeInput}:00` : `${dateInput}T00:00:00`;
      
-     await addCalendarEvent(
+     await runServerAction(
+        addCalendarEvent,
         formData.get('title'),
         new Date(dateStr).toISOString(),
         formData.get('type')
