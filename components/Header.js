@@ -1,7 +1,6 @@
 'use client';
 import { usePathname } from 'next/navigation';
 import { Bell, SignOut } from '@phosphor-icons/react';
-import { logoutUser } from '@/app/auth-actions';
 
 export default function Header({ userName, userRole }) {
   const pathname = usePathname();
@@ -58,13 +57,15 @@ export default function Header({ userName, userRole }) {
                {userRole || 'admin'}
              </span>
            </div>
-           <button
-             onClick={() => logoutUser()}
-             className="ml-2 text-gray-400 hover:text-red-500 transition-colors p-1"
-             title="Cerrar sesion"
-           >
-             <SignOut weight="bold" className="text-xl" />
-           </button>
+           <form action="/api/auth/admin/logout" method="post">
+             <button
+               type="submit"
+               className="ml-2 text-gray-400 hover:text-red-500 transition-colors p-1"
+               title="Cerrar sesion"
+             >
+               <SignOut weight="bold" className="text-xl" />
+             </button>
+           </form>
         </div>
       </div>
     </header>

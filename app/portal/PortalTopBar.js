@@ -1,7 +1,6 @@
 'use client';
 
 import { UserCircle, SignOut } from '@phosphor-icons/react';
-import { logoutClientPortal } from '@/app/portal-actions';
 
 export default function PortalTopBar({ clientName }) {
   return (
@@ -19,12 +18,14 @@ export default function PortalTopBar({ clientName }) {
           </div>
 
           <div className="flex items-center">
-            <button
-              onClick={() => logoutClientPortal()}
-              className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-red-500 hover:bg-red-50 px-4 py-2 rounded-xl transition-all"
-            >
-              Cerrar sesion <SignOut weight="bold" />
-            </button>
+            <form action="/api/auth/client/logout" method="post">
+              <button
+                type="submit"
+                className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-gray-500 transition-all hover:bg-red-50 hover:text-red-500"
+              >
+                Cerrar sesion <SignOut weight="bold" />
+              </button>
+            </form>
           </div>
         </div>
       </div>

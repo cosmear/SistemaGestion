@@ -1,7 +1,14 @@
 import PortalLoginForm from './PortalLoginForm';
 import { UserCircle } from '@phosphor-icons/react/dist/ssr';
 
-export default function PortalLoginPage() {
+export const dynamic = 'force-dynamic';
+
+export default async function PortalLoginPage(props) {
+  const searchParams = await props.searchParams;
+  const initialError = searchParams?.error === 'invalid'
+    ? 'Credenciales invalidas o usuario sin acceso.'
+    : null;
+
   return (
     <div className="relative flex min-h-screen h-full w-full flex-col justify-center bg-[url('https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2629&auto=format&fit=crop')] bg-cover bg-center bg-gray-50 py-12 sm:px-6 lg:px-8">
       <div className="absolute inset-0 z-0 bg-white/40 backdrop-blur-md" />
@@ -20,7 +27,7 @@ export default function PortalLoginPage() {
 
       <div className="z-10 mt-8 animate-fade-in sm:mx-auto sm:w-full sm:max-w-md" style={{ animationDelay: '100ms' }}>
         <div className="rounded-3xl border border-white bg-white/95 px-6 py-10 shadow-[0_20px_60px_rgba(0,0,0,0.1)] backdrop-blur-xl sm:px-10">
-          <PortalLoginForm />
+          <PortalLoginForm initialError={initialError} />
         </div>
       </div>
     </div>

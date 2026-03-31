@@ -9,6 +9,7 @@ export async function proxy(request) {
   if (
     pathname.startsWith('/login') ||
     pathname.startsWith('/portal-login') ||
+    pathname.startsWith('/api/auth/') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon.ico') ||
     pathname.match(/\.(svg|png|jpg|jpeg|gif|webp)$/)

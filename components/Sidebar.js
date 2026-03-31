@@ -13,7 +13,6 @@ import {
   Ticket,
   Receipt,
 } from '@phosphor-icons/react';
-import { logoutUser } from '@/app/auth-actions';
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -74,12 +73,14 @@ export default function Sidebar() {
               <p className="text-xs text-gray-500">Operacion</p>
             </div>
           </div>
-          <button
-            onClick={() => logoutUser()}
-            className="text-xs text-gray-500 hover:text-red-600 text-left px-2 flex items-center gap-2 transition-colors mt-2"
-          >
-            <SignOut weight="regular" /> Cerrar sesion
-          </button>
+          <form action="/api/auth/admin/logout" method="post">
+            <button
+              type="submit"
+              className="text-xs text-gray-500 hover:text-red-600 text-left px-2 flex items-center gap-2 transition-colors mt-2"
+            >
+              <SignOut weight="regular" /> Cerrar sesion
+            </button>
+          </form>
         </div>
       </div>
     </aside>
