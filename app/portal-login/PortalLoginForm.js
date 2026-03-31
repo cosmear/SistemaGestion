@@ -1,31 +1,31 @@
 'use client'
 
-import { useState } from 'react'
+import { useActionState } from 'react'
+import { useFormStatus } from 'react-dom'
 import { SignIn } from '@phosphor-icons/react'
 import { loginClientPortal } from '@/app/portal-actions'
 
-export default function PortalLoginForm() {
-  const [error, setError] = useState(null)
-  const [loading, setLoading] = useState(false)
+const INITIAL_STATE = { error: null }
 
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    setLoading(true)
-    setError(null)
-
-    const formData = new FormData(event.target)
-    const response = await loginClientPortal(formData)
-
-    if (response.success) {
-      window.location.assign('/portal')
-    } else {
-      setError(response.error)
-      setLoading(false)
-    }
-  }
+function SubmitButton() {
+  const { pending } = useFormStatus()
 
   return (
-    <form className="space-y-6" onSubmit={handleSubmit}>
+    <button
+      type="submit"
+      disabled={pending}
+      className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-[0_4px_15px_rgba(21,128,61,0.3)] text-sm font-extrabold text-white bg-brand-600 hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-600 transition-all gap-2 items-center disabled:opacity-70 disabled:cursor-not-allowed hover:-translate-y-0.5"
+    >
+      {pending ? 'Entrando...' : <>Acceder a tu panel <SignIn weight="bold" className="text-lg" /></>}
+    </button>
+  )
+}
+
+export default function PortalLoginForm() {
+  const [state, formAction] = useActionState(loginClientPortal, INITIAL_STATE)
+
+  return (
+    <form className="space-y-6" action={formAction}>
       <div>
         <label className="block text-sm font-bold text-gray-700">
           Email registrado
@@ -54,20 +54,14 @@ export default function PortalLoginForm() {
         </div>
       </div>
 
-      {error && (
+      {state?.error && (
         <div className="bg-red-50 text-red-600 text-sm p-3 rounded-xl border border-red-200 font-bold animate-fade-in flex items-center gap-2 shadow-sm">
-          Error: {error}
+          Error: {state.error}
         </div>
       )}
 
       <div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-[0_4px_15px_rgba(21,128,61,0.3)] text-sm font-extrabold text-white bg-brand-600 hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-600 transition-all gap-2 items-center disabled:opacity-70 disabled:cursor-not-allowed hover:-translate-y-0.5"
-        >
-          {loading ? 'Entrando...' : <>Acceder a tu panel <SignIn weight="bold" className="text-lg" /></>}
-        </button>
+        <SubmitButton />
       </div>
     </form>
   )

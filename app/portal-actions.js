@@ -15,17 +15,17 @@ function trimValue(value) {
   return normalized.length > 0 ? normalized : null
 }
 
-export async function loginClientPortal(formData) {
+export async function loginClientPortal(_previousState, formData) {
   const email = formData.get('email')
   const password = formData.get('password')
   const user = await authenticateClientUser(email, password)
 
   if (user) {
     await createClientSession(user)
-    return { success: true }
+    redirect('/portal')
   }
 
-  return { success: false, error: 'Credenciales invalidas o usuario sin acceso.' }
+  return { error: 'Credenciales invalidas o usuario sin acceso.' }
 }
 
 export async function logoutClientPortal() {

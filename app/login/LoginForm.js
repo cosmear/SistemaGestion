@@ -1,31 +1,31 @@
 'use client'
 
-import { useState } from 'react'
+import { useActionState } from 'react'
+import { useFormStatus } from 'react-dom'
 import { SignIn } from '@phosphor-icons/react'
 import { loginUser } from '@/app/auth-actions'
 
-export default function LoginForm() {
-  const [error, setError] = useState(null)
-  const [loading, setLoading] = useState(false)
+const INITIAL_STATE = { error: null }
 
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    setLoading(true)
-    setError(null)
-
-    const formData = new FormData(event.target)
-    const response = await loginUser(formData)
-
-    if (response.success) {
-      window.location.assign('/')
-    } else {
-      setError(response.error)
-      setLoading(false)
-    }
-  }
+function SubmitButton() {
+  const { pending } = useFormStatus()
 
   return (
-    <form className="space-y-6" onSubmit={handleSubmit}>
+    <button
+      type="submit"
+      disabled={pending}
+      className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-gray-900 hover:bg-black focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors gap-2 items-center disabled:opacity-70 disabled:cursor-not-allowed"
+    >
+      {pending ? 'Ingresando...' : <>Entrar <SignIn weight="bold" className="text-lg" /></>}
+    </button>
+  )
+}
+
+export default function LoginForm() {
+  const [state, formAction] = useActionState(loginUser, INITIAL_STATE)
+
+  return (
+    <form className="space-y-6" action={formAction}>
       <div>
         <label htmlFor="username" className="block text-sm font-medium text-gray-700">
           Usuario (Admin)
@@ -57,20 +57,14 @@ export default function LoginForm() {
         </div>
       </div>
 
-      {error && (
+      {state?.error && (
         <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-100 font-medium animate-fade-in flex items-center gap-2">
-          Error: {error}
+          Error: {state.error}
         </div>
       )}
 
       <div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-gray-900 hover:bg-black focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors gap-2 items-center disabled:opacity-70 disabled:cursor-not-allowed"
-        >
-          {loading ? 'Ingresando...' : <>Entrar <SignIn weight="bold" className="text-lg" /></>}
-        </button>
+        <SubmitButton />
       </div>
     </form>
   )
