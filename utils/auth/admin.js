@@ -13,7 +13,7 @@ const LEGACY_ADMIN_USERS = {
     fullName: 'Cosme',
     role: 'admin',
     passwordHash:
-      'scrypt:6fdeb36a5f51fb33c0f665f1425bb9c1:f300f7fb63eb03d97b872f40c591995b5beeab8fee515f5ff1e4b803dcb862cd361d00dc67a3d88ce6850409ef40c2da6c95c074b3e69cb30c11db069008a390',
+      'scrypt:16eebd5f478986db75653f1d71cf6cc5:79813cd8195a5195cfe614096265d098c1cad7f51c5d8e2273da992b5bde49fcf7b6b06e05b5181d138303d5d1ae3c5c83df46eb9e3a7445838a06e09f68ae0b',
   },
   nacho: {
     id: 'legacy-nacho',
