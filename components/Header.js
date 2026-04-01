@@ -19,6 +19,14 @@ export default function Header({ userName, userRole }) {
         return 'Gestion de Tareas';
       case '/calendar':
         return 'Calendario';
+      case '/daily-meetings':
+        return 'Reunion Diaria';
+      case '/communication':
+        return 'Comunicacion del Mes';
+      case '/annual-goals':
+        return 'Objetivos Anuales';
+      case '/monthly-goals':
+        return 'Objetivos Mensuales';
       case '/notes':
         return 'Notas';
       case '/tickets':

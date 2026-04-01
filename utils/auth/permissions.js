@@ -3,12 +3,16 @@ export const INTERNAL_ROLES = ['admin', 'manager', 'operator', 'employee'];
 const LIMITED_STAFF_ROLES = new Set(['operator', 'employee']);
 
 const SECTION_RULES = {
-  dashboard: ['admin', 'manager'],
+  dashboard: INTERNAL_ROLES,
   clients: INTERNAL_ROLES,
   cashflow: ['admin', 'manager'],
   budget: ['admin', 'manager'],
   tasks: INTERNAL_ROLES,
   calendar: INTERNAL_ROLES,
+  dailyMeetings: INTERNAL_ROLES,
+  communication: INTERNAL_ROLES,
+  annualGoals: INTERNAL_ROLES,
+  monthlyGoals: INTERNAL_ROLES,
   notes: INTERNAL_ROLES,
   tickets: ['admin', 'manager'],
   billing: ['admin', 'manager'],
@@ -53,7 +57,7 @@ export function canManageUsers(sessionOrRole) {
 }
 
 export function canAccessTeamBoard(sessionOrRole) {
-  return !isLimitedStaff(sessionOrRole);
+  return INTERNAL_ROLES.includes(getRoleValue(sessionOrRole));
 }
 
 export function isClientAssigned(session, clientId) {
