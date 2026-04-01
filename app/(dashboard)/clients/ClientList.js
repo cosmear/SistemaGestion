@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -8,6 +9,7 @@ import {
   CurrencyCircleDollar,
   EnvelopeOpen,
   HandCoins,
+  Kanban,
   Key,
   MagnifyingGlass,
   NotePencil,
@@ -34,7 +36,14 @@ const STATUS_FILTERS = [
   { key: 'inactive', label: 'Inactivos' },
 ];
 
-export default function ClientList({ initialClients, clientCredentials, clientTickets, clientInvoices }) {
+export default function ClientList({
+  initialClients,
+  clientCredentials,
+  clientTickets,
+  clientInvoices,
+  canManageClients,
+  canViewFinancials,
+}) {
   const router = useRouter();
   const [clients, setClients] = useState(initialClients || []);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -273,7 +282,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
   };
 
   const getHealthTone = (ticketInfo, invoiceInfo) => {
-    if ((invoiceInfo?.overdue || 0) > 0) {
+    if (canViewFinancials && (invoiceInfo?.overdue || 0) > 0) {
       return 'bg-rose-50 text-rose-700';
     }
 
@@ -285,7 +294,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
   };
 
   const getHealthLabel = (ticketInfo, invoiceInfo) => {
-    if ((invoiceInfo?.overdue || 0) > 0) return 'Cobro en riesgo';
+    if (canViewFinancials && (invoiceInfo?.overdue || 0) > 0) return 'Cobro en riesgo';
     if ((ticketInfo?.open || 0) >= 3) return 'Alta demanda';
     return 'Saludable';
   };
@@ -301,16 +310,18 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
           </p>
         </div>
 
-        <button
-          onClick={openCreateModal}
-          className="inline-flex items-center gap-2 rounded-2xl bg-brand-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-brand-200 transition-all hover:-translate-y-0.5 hover:bg-brand-700"
-        >
-          <Plus weight="bold" />
-          Nuevo cliente
-        </button>
+        {canManageClients ? (
+          <button
+            onClick={openCreateModal}
+            className="inline-flex items-center gap-2 rounded-2xl bg-brand-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-brand-200 transition-all hover:-translate-y-0.5 hover:bg-brand-700"
+          >
+            <Plus weight="bold" />
+            Nuevo cliente
+          </button>
+        ) : null}
       </div>
 
-      <div className="mb-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-5">
+      <div className={`mb-6 grid gap-4 md:grid-cols-2 ${canViewFinancials ? '2xl:grid-cols-5' : 'xl:grid-cols-3'}`}>
         <div className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
           <div className="flex items-center justify-between">
             <div>
@@ -324,31 +335,35 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">MRR activo</p>
-              <p className="mt-3 text-3xl font-black tracking-tight text-emerald-700">{formatMoney(totalMrr)}</p>
-              <p className="mt-2 text-sm font-medium text-gray-500">Mensualidad estimada de clientes activos</p>
-            </div>
-            <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-600">
-              <HandCoins className="text-2xl" weight="fill" />
+        {canViewFinancials ? (
+          <div className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">MRR activo</p>
+                <p className="mt-3 text-3xl font-black tracking-tight text-emerald-700">{formatMoney(totalMrr)}</p>
+                <p className="mt-2 text-sm font-medium text-gray-500">Mensualidad estimada de clientes activos</p>
+              </div>
+              <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-600">
+                <HandCoins className="text-2xl" weight="fill" />
+              </div>
             </div>
           </div>
-        </div>
+        ) : null}
 
-        <div className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">Portales activos</p>
-              <p className="mt-3 text-3xl font-black tracking-tight text-indigo-700">{portalEnabledCount}</p>
-              <p className="mt-2 text-sm font-medium text-gray-500">Clientes con acceso B2B configurado</p>
-            </div>
-            <div className="rounded-2xl bg-indigo-50 p-3 text-indigo-600">
-              <Key className="text-2xl" weight="fill" />
+        {canManageClients ? (
+          <div className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">Portales activos</p>
+                <p className="mt-3 text-3xl font-black tracking-tight text-indigo-700">{portalEnabledCount}</p>
+                <p className="mt-2 text-sm font-medium text-gray-500">Clientes con acceso B2B configurado</p>
+              </div>
+              <div className="rounded-2xl bg-indigo-50 p-3 text-indigo-600">
+                <Key className="text-2xl" weight="fill" />
+              </div>
             </div>
           </div>
-        </div>
+        ) : null}
 
         <div className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
           <div className="flex items-center justify-between">
@@ -363,18 +378,20 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">Cobranza abierta</p>
-              <p className="mt-3 text-3xl font-black tracking-tight text-rose-700">{formatMoney(outstandingAmount)}</p>
-              <p className="mt-2 text-sm font-medium text-gray-500">{overdueInvoicesCount} facturas vencidas</p>
-            </div>
-            <div className="rounded-2xl bg-rose-50 p-3 text-rose-600">
-              <CurrencyCircleDollar className="text-2xl" weight="fill" />
+        {canViewFinancials ? (
+          <div className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">Cobranza abierta</p>
+                <p className="mt-3 text-3xl font-black tracking-tight text-rose-700">{formatMoney(outstandingAmount)}</p>
+                <p className="mt-2 text-sm font-medium text-gray-500">{overdueInvoicesCount} facturas vencidas</p>
+              </div>
+              <div className="rounded-2xl bg-rose-50 p-3 text-rose-600">
+                <CurrencyCircleDollar className="text-2xl" weight="fill" />
+              </div>
             </div>
           </div>
-        </div>
+        ) : null}
       </div>
 
       <div className="mb-6 rounded-[28px] border border-gray-200 bg-white p-4 shadow-[0_12px_35px_rgba(15,23,42,0.04)]">
@@ -467,25 +484,29 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
                   <span className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase ${onboardingMeta.className}`}>
                     {onboardingMeta.label}
                   </span>
-                  <span className={`rounded-full px-3 py-1 text-[11px] font-black uppercase ${credentials ? 'bg-indigo-50 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}>
-                    {credentials ? 'Portal activo' : 'Sin portal'}
-                  </span>
+                  {canManageClients ? (
+                    <span className={`rounded-full px-3 py-1 text-[11px] font-black uppercase ${credentials ? 'bg-indigo-50 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {credentials ? 'Portal activo' : 'Sin portal'}
+                    </span>
+                  ) : null}
                 </div>
 
-                <div className="mt-5 grid grid-cols-3 gap-3">
-                  <div className="rounded-2xl bg-gray-50 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">Setup</p>
-                    <p className="mt-2 text-sm font-black text-gray-900">{formatMoney(client.pack_dev_fee)}</p>
+                {canViewFinancials ? (
+                  <div className="mt-5 grid grid-cols-3 gap-3">
+                    <div className="rounded-2xl bg-gray-50 px-4 py-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">Setup</p>
+                      <p className="mt-2 text-sm font-black text-gray-900">{formatMoney(client.pack_dev_fee)}</p>
+                    </div>
+                    <div className="rounded-2xl bg-brand-50 px-4 py-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-brand-500">Mensual</p>
+                      <p className="mt-2 text-sm font-black text-brand-700">{formatMoney(client.pack_monthly_fee)}</p>
+                    </div>
+                    <div className="rounded-2xl bg-gray-50 px-4 py-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">Cobranza</p>
+                      <p className="mt-2 text-sm font-black text-gray-900">{formatMoney(invoiceInfo.outstandingAmount)}</p>
+                    </div>
                   </div>
-                  <div className="rounded-2xl bg-brand-50 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-brand-500">Mensual</p>
-                    <p className="mt-2 text-sm font-black text-brand-700">{formatMoney(client.pack_monthly_fee)}</p>
-                  </div>
-                  <div className="rounded-2xl bg-gray-50 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">Cobranza</p>
-                    <p className="mt-2 text-sm font-black text-gray-900">{formatMoney(invoiceInfo.outstandingAmount)}</p>
-                  </div>
-                </div>
+                ) : null}
 
                 <div className="mt-5 rounded-[24px] border border-gray-100 bg-gray-50 p-4">
                   <div className="flex items-center justify-between gap-3">
@@ -537,69 +558,90 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
                   ) : null}
                 </div>
 
-                <div className="mt-5 grid grid-cols-3 gap-3">
-                  <div className="rounded-2xl bg-orange-50 px-4 py-3">
+                <div className={`mt-5 grid gap-3 ${canManageClients ? 'sm:grid-cols-2' : 'sm:grid-cols-1'}`}>
+                  <Link
+                    href={`/tasks?board=client_${client.id}`}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 transition-colors hover:bg-emerald-100"
+                  >
+                    <Kanban weight="bold" />
+                    Abrir tablero
+                  </Link>
+
+                  {canManageClients ? (
+                    <>
+                      <button
+                        onClick={() => openEditModal(client)}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-200"
+                      >
+                        <PencilSimple weight="bold" />
+                        Editar ficha
+                      </button>
+
+                      <button
+                        onClick={() => openCredModal(client)}
+                        className={`rounded-2xl px-4 py-3 text-sm font-bold transition-colors ${
+                          credentials
+                            ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {credentials ? 'Reset portal' : 'Dar acceso portal'}
+                      </button>
+
+                      <button
+                        onClick={() => toggleStatus(client.id, client.status, client.name)}
+                        disabled={isToggling}
+                        className={`rounded-2xl px-4 py-3 text-sm font-bold transition-colors ${
+                          client.status === 'active'
+                            ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                            : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                        } disabled:opacity-50`}
+                      >
+                        {client.status === 'active' ? 'Marcar inactivo' : 'Reactivar cliente'}
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+
+                {canViewFinancials ? (
+                  <div className="mt-5 grid grid-cols-3 gap-3">
+                    <div className="rounded-2xl bg-orange-50 px-4 py-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-orange-500">Tickets</p>
+                      <p className="mt-2 text-sm font-black text-orange-700">{ticketInfo.open} abiertos</p>
+                    </div>
+                    <div className="rounded-2xl bg-blue-50 px-4 py-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-500">Facturas</p>
+                      <p className="mt-2 text-sm font-black text-blue-700">{invoiceInfo.open} abiertas</p>
+                    </div>
+                    <div className="rounded-2xl bg-rose-50 px-4 py-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-500">Vencidas</p>
+                      <p className="mt-2 text-sm font-black text-rose-700">{invoiceInfo.overdue}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-5 rounded-2xl bg-orange-50 px-4 py-3">
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-orange-500">Tickets</p>
                     <p className="mt-2 text-sm font-black text-orange-700">{ticketInfo.open} abiertos</p>
                   </div>
-                  <div className="rounded-2xl bg-blue-50 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-500">Facturas</p>
-                    <p className="mt-2 text-sm font-black text-blue-700">{invoiceInfo.open} abiertas</p>
-                  </div>
-                  <div className="rounded-2xl bg-rose-50 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-500">Vencidas</p>
-                    <p className="mt-2 text-sm font-black text-rose-700">{invoiceInfo.overdue}</p>
-                  </div>
-                </div>
+                )}
 
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {canManageClients ? (
                   <button
-                    onClick={() => openEditModal(client)}
-                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-200"
+                    onClick={() => handleDeleteClient(client.id, client.name)}
+                    disabled={isDeleting}
+                    className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
                   >
-                    <PencilSimple weight="bold" />
-                    Editar ficha
+                    <Trash weight="bold" />
+                    {isDeleting ? 'Eliminando...' : 'Eliminar cliente'}
                   </button>
-
-                  <button
-                    onClick={() => openCredModal(client)}
-                    className={`rounded-2xl px-4 py-3 text-sm font-bold transition-colors ${
-                      credentials
-                        ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {credentials ? 'Reset portal' : 'Dar acceso portal'}
-                  </button>
-
-                  <button
-                    onClick={() => toggleStatus(client.id, client.status, client.name)}
-                    disabled={isToggling}
-                    className={`rounded-2xl px-4 py-3 text-sm font-bold transition-colors ${
-                      client.status === 'active'
-                        ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                    } disabled:opacity-50`}
-                  >
-                    {client.status === 'active' ? 'Marcar inactivo' : 'Reactivar cliente'}
-                  </button>
-                </div>
-
-                <button
-                  onClick={() => handleDeleteClient(client.id, client.name)}
-                  disabled={isDeleting}
-                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
-                >
-                  <Trash weight="bold" />
-                  {isDeleting ? 'Eliminando...' : 'Eliminar cliente'}
-                </button>
+                ) : null}
               </article>
             );
           })}
         </div>
       )}
 
-      {clientModal.open && (
+      {canManageClients && clientModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm">
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[32px] bg-white shadow-2xl custom-scrollbar animate-fade-in">
             <div className="border-b border-gray-100 bg-gray-50 p-6">
@@ -799,7 +841,7 @@ export default function ClientList({ initialClients, clientCredentials, clientTi
         </div>
       )}
 
-      {credModal.open && credModal.client && (
+      {canManageClients && credModal.open && credModal.client && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md overflow-hidden rounded-[32px] border-t-4 border-indigo-600 bg-white shadow-2xl animate-fade-in">
             <div className="border-b border-gray-100 bg-indigo-50/40 p-6">

@@ -2,7 +2,7 @@ import { createClient } from '@/utils/supabase/server';
 import { requireAdminSession } from '@/utils/auth/admin';
 
 export default async function AuditPage() {
-  await requireAdminSession();
+  await requireAdminSession(['admin', 'manager']);
   const supabase = await createClient();
 
   const { data: logs, error } = await supabase

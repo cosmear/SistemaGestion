@@ -1,155 +1,309 @@
 'use client';
-import { useState } from 'react';
+
+import { useMemo, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { CalendarBlank, Plus, X, Handshake, BellRinging, Trash } from '@phosphor-icons/react';
+import { CalendarBlank, Plus, User, Users, X } from '@phosphor-icons/react';
 import { addCalendarEvent, deleteCalendarEvent } from '@/app/actions';
 import { runServerAction } from '@/utils/client/runServerAction';
 
-export default function CalendarClient({ events }) {
+export default function CalendarClient({ events, internalUsers, currentUserId }) {
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [visibility, setVisibility] = useState('personal');
+  const userMap = useMemo(
+    () => Object.fromEntries((internalUsers || []).map((user) => [user.id, user])),
+    [internalUsers]
+  );
+  const shareableUsers = (internalUsers || []).filter((user) => user.id !== currentUserId);
+
+  const resetModal = () => {
+    setShowModal(false);
+    setVisibility('personal');
+    setIsSubmitting(false);
+  };
 
   const handleEventClick = async (info) => {
     const isTask = info.event.extendedProps.isTask;
     const isEvent = info.event.extendedProps.isEvent;
-    
+
     if (isTask) {
-        alert(`📌 Vencimiento de Tarea\n\nNombre: ${info.event.title}\nFecha: ${info.event.start.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}\nPrioridad: ${info.event.extendedProps.priority?.toUpperCase()}`);
-    } 
-    
-    if (isEvent) {
-        const confirmDelete = window.confirm(`📆 Evento Proyectado\n\n${info.event.title}\nInicia: ${info.event.start.toLocaleString('es-AR')}\n\n¿Deseas ELIMINAR este evento agendado?`);
-        if(confirmDelete) {
-           await runServerAction(
-             deleteCalendarEvent,
-             info.event.extendedProps.originalId,
-             info.event.extendedProps.originalTitle
-           );
-        }
+      const assignedUser = info.event.extendedProps.assignedUserId
+        ? userMap[info.event.extendedProps.assignedUserId]?.full_name
+        : null;
+
+      alert(
+        `Vencimiento de tarea\n\nNombre: ${info.event.title}\nFecha: ${info.event.start.toLocaleDateString(
+          'es-AR',
+          {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          }
+        )}\nPrioridad: ${(info.event.extendedProps.priority || 'low').toUpperCase()}${
+          assignedUser ? `\nResponsable: ${assignedUser}` : ''
+        }`
+      );
+      return;
+    }
+
+    if (!isEvent) {
+      return;
+    }
+
+    const summary = `${info.event.title}\nInicia: ${info.event.start.toLocaleString('es-AR')}`;
+
+    if (!info.event.extendedProps.canDelete) {
+      alert(`Evento agendado\n\n${summary}`);
+      return;
+    }
+
+    const confirmDelete = window.confirm(`Evento agendado\n\n${summary}\n\nDeseas eliminarlo?`);
+
+    if (confirmDelete) {
+      const result = await runServerAction(
+        deleteCalendarEvent,
+        info.event.extendedProps.originalId,
+        info.event.extendedProps.originalTitle
+      );
+
+      if (!result.success) {
+        alert(result.error || 'No se pudo eliminar el evento.');
+      }
     }
   };
 
-  const handleAddSubmit = async (e) => {
-     e.preventDefault();
-     setIsSubmitting(true);
-     const formData = new FormData(e.target);
-     
-     // Construimos el Date string con la hora
-     const dateInput = formData.get('date');
-     const timeInput = formData.get('time');
-     const dateStr = timeInput ? `${dateInput}T${timeInput}:00` : `${dateInput}T00:00:00`;
-     
-     await runServerAction(
-        addCalendarEvent,
-        formData.get('title'),
-        new Date(dateStr).toISOString(),
-        formData.get('type')
-     );
-     
-     setShowModal(false);
-     setIsSubmitting(false);
+  const handleAddSubmit = async (event) => {
+    event.preventDefault();
+    setIsSubmitting(true);
+
+    const formData = new FormData(event.target);
+    const dateInput = formData.get('date');
+    const timeInput = formData.get('time');
+    const dateStr = timeInput ? `${dateInput}T${timeInput}:00` : `${dateInput}T00:00:00`;
+    const payload = {
+      title: formData.get('title'),
+      dateStr: new Date(dateStr).toISOString(),
+      type: formData.get('type'),
+      visibility: formData.get('visibility'),
+      sharedUserIds: formData.getAll('sharedUserIds'),
+    };
+
+    const result = await runServerAction(addCalendarEvent, payload);
+
+    if (!result.success) {
+      alert(result.error || 'No se pudo agendar el evento.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    resetModal();
   };
 
   return (
-    <div className="h-full flex flex-col animate-fade-in block absolute inset-0 p-4 sm:p-8 bg-gray-50/30">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 shrink-0 border-b border-gray-200 pb-4 gap-4">
+    <div className="absolute inset-0 flex h-full flex-col bg-gray-50/30 p-4 sm:p-8">
+      <div className="mb-6 flex shrink-0 flex-col items-start justify-between gap-4 border-b border-gray-200 pb-4 sm:flex-row sm:items-center">
         <div>
-           <h3 className="text-2xl font-extrabold text-gray-900 mb-1 tracking-tight flex items-center gap-3">
-             <CalendarBlank className="text-brand-600" weight="fill" /> Agenda Corporativa
-           </h3>
-           <p className="text-sm text-gray-500 font-medium">Cronograma inteligente. Cruza tus Tareas Kanban y tus Eventos extra.</p>
+          <h3 className="mb-1 flex items-center gap-3 text-2xl font-extrabold tracking-tight text-gray-900">
+            <CalendarBlank className="text-brand-600" weight="fill" /> Agenda corporativa
+          </h3>
+          <p className="text-sm font-medium text-gray-500">
+            Cruza vencimientos de tareas con eventos globales, personales o compartidos por @personas.
+          </p>
         </div>
-        <button 
-           onClick={() => setShowModal(true)}
-           className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-lg shadow-brand-200 hover:-translate-y-0.5"
+        <button
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-brand-200 transition-all hover:-translate-y-0.5 hover:bg-brand-700"
         >
-           <Plus weight="bold" className="text-lg" /> Añadir Cita/Evento
+          <Plus weight="bold" className="text-lg" /> Nuevo evento
         </button>
       </div>
-      
-      <div className="flex-1 bg-white p-4 sm:p-8 rounded-3xl border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col transition-all">
-         {/* Leyenda Visual */}
-         <div className="flex flex-wrap gap-4 mb-4 border-b border-gray-100 pb-4 shrink-0">
-            <span className="text-xs font-bold text-gray-500 flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#8B5CF6]"></span> Tarea Personal</span>
-            <span className="text-xs font-bold text-gray-500 flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#3B82F6]"></span> Tareas de Equipo</span>
-            <span className="text-xs font-bold text-gray-500 flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#10B981]"></span> Tareas Cliente B2B</span>
-            <span className="text-xs font-bold text-gray-500 flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#F97316]"></span> Eventos Independientes</span>
-         </div>
 
-         <div className="flex-1 h-full min-h-0 w-full animate-fade-in custom-scrollbar relative">
-           <FullCalendar
-             plugins={[ dayGridPlugin, timeGridPlugin, interactionPlugin ]}
-             initialView="dayGridMonth"
-             headerToolbar={{
-               left: 'prev,next today',
-               center: 'title',
-               right: 'dayGridMonth,timeGridWeek'
-             }}
-             events={events}
-             eventClick={handleEventClick}
-             height="100%"
-             locale="es"
-             dayMaxEvents={true}
-             fixedWeekCount={false}
-           />
-         </div>
+      <div className="flex flex-1 flex-col overflow-hidden rounded-3xl border border-gray-100 bg-white p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:p-8">
+        <div className="mb-4 flex flex-wrap gap-4 border-b border-gray-100 pb-4 shrink-0">
+          <span className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
+            <span className="h-3 w-3 rounded-full bg-[#8B5CF6]" /> Tarea personal
+          </span>
+          <span className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
+            <span className="h-3 w-3 rounded-full bg-[#3B82F6]" /> Tareas de equipo
+          </span>
+          <span className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
+            <span className="h-3 w-3 rounded-full bg-[#10B981]" /> Tareas cliente
+          </span>
+          <span className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
+            <span className="h-3 w-3 rounded-full bg-[#F97316]" /> Evento global
+          </span>
+          <span className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
+            <span className="h-3 w-3 rounded-full bg-[#EC4899]" /> Evento personal o compartido
+          </span>
+        </div>
+
+        <div className="custom-scrollbar relative min-h-0 flex-1 w-full overflow-hidden">
+          <FullCalendar
+            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+            initialView="dayGridMonth"
+            headerToolbar={{
+              left: 'prev,next today',
+              center: 'title',
+              right: 'dayGridMonth,timeGridWeek',
+            }}
+            events={events}
+            eventClick={handleEventClick}
+            height="100%"
+            locale="es"
+            dayMaxEvents
+            fixedWeekCount={false}
+          />
+        </div>
       </div>
 
-      {/* MODAL PARA AÑADIR EVENTOS AL CALENDARIO */}
-      {showModal && (
-        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl relative animate-fade-in overflow-hidden border border-brand-100">
-            <div className="bg-brand-50 p-6 border-b border-brand-100 flex justify-between items-center">
-              <h3 className="text-xl font-extrabold flex items-center gap-2 text-brand-900">
-                 <CalendarBlank weight="fill" className="text-brand-600"/> Agendar Evento
-              </h3>
-              <button 
-                 onClick={() => setShowModal(false)} 
-                 className="text-brand-400 hover:text-brand-800 hover:bg-white p-1 rounded-lg transition-colors"
+      {showModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-brand-100 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-brand-100 bg-brand-50 p-6">
+              <div>
+                <h3 className="flex items-center gap-2 text-xl font-extrabold text-brand-900">
+                  <CalendarBlank weight="fill" className="text-brand-600" /> Agendar evento
+                </h3>
+                <p className="mt-1 text-sm font-medium text-brand-700">
+                  Puedes dejarlo solo para ti, compartirlo con usuarios concretos o volverlo global.
+                </p>
+              </div>
+              <button
+                onClick={resetModal}
+                className="rounded-lg p-1 text-brand-400 transition-colors hover:bg-white hover:text-brand-800"
               >
                 <X weight="bold" />
               </button>
             </div>
-            
-            <form onSubmit={handleAddSubmit} className="p-6 space-y-5">
+
+            <form onSubmit={handleAddSubmit} className="space-y-5 p-6">
               <div>
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Título de la cita</label>
-                <input type="text" name="title" required placeholder="Ej: Reunión con Inversor..." className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white font-bold text-gray-900 transition-colors" />
+                <label className="mb-2 block text-xs font-black uppercase tracking-widest text-gray-400">
+                  Titulo
+                </label>
+                <input
+                  type="text"
+                  name="title"
+                  required
+                  placeholder="Ej: Reunion con cliente"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-bold text-gray-900 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                 <div>
-                   <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Día</label>
-                   <input type="date" name="date" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white font-bold text-gray-900 transition-colors" />
-                 </div>
-                 <div>
-                   <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Horario (Opcional)</label>
-                   <input type="time" name="time" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white font-bold text-gray-900 transition-colors" />
-                 </div>
+                <div>
+                  <label className="mb-2 block text-xs font-black uppercase tracking-widest text-gray-400">
+                    Dia
+                  </label>
+                  <input
+                    type="date"
+                    name="date"
+                    required
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-bold text-gray-900 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-xs font-black uppercase tracking-widest text-gray-400">
+                    Horario
+                  </label>
+                  <input
+                    type="time"
+                    name="time"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-bold text-gray-900 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Clase de Evento</label>
-                <select name="type" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white font-bold text-gray-700 transition-colors">
-                   <option value="meeting">🤝 Reunión Presencial / Meet</option>
-                   <option value="call">📞 Llamada Telefónica</option>
-                   <option value="reminder">🔔 Recordatorio</option>
-                </select>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-xs font-black uppercase tracking-widest text-gray-400">
+                    Tipo
+                  </label>
+                  <select
+                    name="type"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-bold text-gray-700 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  >
+                    <option value="meeting">Reunion</option>
+                    <option value="call">Llamada</option>
+                    <option value="reminder">Recordatorio</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-xs font-black uppercase tracking-widest text-gray-400">
+                    Alcance
+                  </label>
+                  <select
+                    name="visibility"
+                    value={visibility}
+                    onChange={(event) => setVisibility(event.target.value)}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-bold text-gray-700 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  >
+                    <option value="personal">Personal</option>
+                    <option value="global">Global</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="pt-4 flex justify-end gap-3 border-t border-gray-100 mt-6">
-                <button type="button" onClick={() => setShowModal(false)} className="px-5 py-3 text-gray-600 hover:bg-gray-100 rounded-xl font-bold transition-colors">Abortar</button>
-                <button type="submit" disabled={isSubmitting} className="px-6 py-3 text-white rounded-xl font-extrabold transition-all shadow-lg bg-brand-600 hover:bg-brand-700 shadow-brand-200 disabled:opacity-50 hover:-translate-y-0.5">
-                  Confirmar en Agenda
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <div className="flex items-center gap-2">
+                  {visibility === 'global' ? (
+                    <Users className="text-orange-500" weight="fill" />
+                  ) : (
+                    <User className="text-pink-500" weight="fill" />
+                  )}
+                  <p className="text-sm font-black text-gray-900">Arrobar personas</p>
+                </div>
+                <p className="mt-1 text-sm font-medium text-gray-500">
+                  Aunque el evento sea personal, las personas seleccionadas tambien lo veran en su calendario.
+                </p>
+
+                {shareableUsers.length === 0 ? (
+                  <p className="mt-4 text-sm font-medium text-gray-500">No hay otros usuarios internos activos.</p>
+                ) : (
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    {shareableUsers.map((user) => (
+                      <label
+                        key={user.id}
+                        className="flex items-center justify-between rounded-2xl border border-white bg-white px-4 py-3 text-sm font-semibold text-gray-700 shadow-sm"
+                      >
+                        <span>{user.full_name}</span>
+                        <input
+                          type="checkbox"
+                          name="sharedUserIds"
+                          value={user.id}
+                          className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
+                <button
+                  type="button"
+                  onClick={resetModal}
+                  className="rounded-xl px-5 py-3 font-bold text-gray-600 transition-colors hover:bg-gray-100"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="rounded-xl bg-brand-600 px-6 py-3 font-extrabold text-white shadow-lg shadow-brand-200 transition-all hover:-translate-y-0.5 hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Guardando...' : 'Confirmar en agenda'}
                 </button>
               </div>
             </form>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

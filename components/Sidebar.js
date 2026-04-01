@@ -2,32 +2,43 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  SquaresFour,
-  Users,
-  ListDashes,
-  ChartLineUp,
-  Kanban,
   CalendarBlank,
+  ChartLineUp,
   ClockCounterClockwise,
+  Kanban,
+  ListDashes,
+  NotePencil,
+  Receipt,
+  SquaresFour,
   SignOut,
   Ticket,
-  Receipt,
+  UserCircle,
+  Users,
 } from '@phosphor-icons/react';
+import { canAccessSection } from '@/utils/auth/permissions';
 
-export default function Sidebar() {
+const ROLE_LABELS = {
+  admin: 'Administrador',
+  manager: 'Manager',
+  employee: 'Empleado',
+  operator: 'Empleado',
+};
+
+export default function Sidebar({ userName, userRole }) {
   const pathname = usePathname();
-
   const navLinks = [
-    { href: '/', icon: SquaresFour, label: 'Dashboard' },
-    { href: '/clients', icon: Users, label: 'Clientes' },
-    { href: '/cashflow', icon: ListDashes, label: 'Cashflow' },
-    { href: '/budget', icon: ChartLineUp, label: 'Presupuesto' },
-    { href: '/tasks', icon: Kanban, label: 'Tareas' },
-    { href: '/calendar', icon: CalendarBlank, label: 'Calendario' },
-    { href: '/tickets', icon: Ticket, label: 'Casos B2B' },
-    { href: '/billing', icon: Receipt, label: 'Cobranzas' },
-    { href: '/audit', icon: ClockCounterClockwise, label: 'Historial' },
-  ];
+    canAccessSection(userRole, 'dashboard') ? { href: '/', icon: SquaresFour, label: 'Dashboard' } : null,
+    canAccessSection(userRole, 'clients') ? { href: '/clients', icon: Users, label: 'Clientes' } : null,
+    canAccessSection(userRole, 'tasks') ? { href: '/tasks', icon: Kanban, label: 'Tareas' } : null,
+    canAccessSection(userRole, 'calendar') ? { href: '/calendar', icon: CalendarBlank, label: 'Calendario' } : null,
+    canAccessSection(userRole, 'notes') ? { href: '/notes', icon: NotePencil, label: 'Notas' } : null,
+    canAccessSection(userRole, 'cashflow') ? { href: '/cashflow', icon: ListDashes, label: 'Cashflow' } : null,
+    canAccessSection(userRole, 'budget') ? { href: '/budget', icon: ChartLineUp, label: 'Presupuesto' } : null,
+    canAccessSection(userRole, 'tickets') ? { href: '/tickets', icon: Ticket, label: 'Casos B2B' } : null,
+    canAccessSection(userRole, 'billing') ? { href: '/billing', icon: Receipt, label: 'Cobranzas' } : null,
+    canAccessSection(userRole, 'audit') ? { href: '/audit', icon: ClockCounterClockwise, label: 'Historial' } : null,
+    canAccessSection(userRole, 'users') ? { href: '/users', icon: UserCircle, label: 'Usuarios' } : null,
+  ].filter(Boolean);
 
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-full shadow-sm z-10 transition-all duration-300 relative shrink-0">
@@ -43,7 +54,7 @@ export default function Sidebar() {
 
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
         {navLinks.map((link) => {
-          const isActive = pathname === link.href;
+          const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`);
           const Icon = link.icon;
           return (
             <Link
@@ -66,11 +77,11 @@ export default function Sidebar() {
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-3 px-2">
             <div className="w-8 h-8 rounded-full bg-green-100 text-green-700 font-bold overflow-hidden shadow-inner flex items-center justify-center">
-              U
+              {userName?.charAt(0)?.toUpperCase() || 'U'}
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-900">Panel interno</p>
-              <p className="text-xs text-gray-500">Operacion</p>
+              <p className="text-sm font-medium text-gray-900">{userName || 'Panel interno'}</p>
+              <p className="text-xs text-gray-500">{ROLE_LABELS[userRole] || userRole || 'Operacion'}</p>
             </div>
           </div>
           <form action="/api/auth/admin/logout" method="post">

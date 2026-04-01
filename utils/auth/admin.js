@@ -2,9 +2,10 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/utils/supabase/server';
 import { clearSessionCookie, getSessionFromCookie, persistSessionCookie, SESSION_COOKIE_NAMES } from './session';
 import { verifyPasswordHash } from './token';
+import { getDefaultInternalRoute, INTERNAL_ROLES, normalizeInternalRole } from './permissions';
 
 const ADMIN_COOKIE = SESSION_COOKIE_NAMES.admin;
-const DEFAULT_ROLES = ['admin', 'manager', 'operator'];
+const DEFAULT_ROLES = INTERNAL_ROLES;
 
 const LEGACY_ADMIN_USERS = {
   cosme: {
@@ -35,7 +36,7 @@ function buildAdminSessionPayload(user) {
     userId: user.id,
     username: user.username,
     fullName: user.fullName || user.username,
-    role: user.role || 'admin',
+    role: normalizeInternalRole(user.role),
   };
 }
 
@@ -60,8 +61,72 @@ async function findInternalAdmin(username) {
     id: data.id,
     username: data.username,
     fullName: data.full_name || data.username,
-    role: data.role || 'admin',
+    role: normalizeInternalRole(data.role),
     passwordHash: data.password_hash,
+  };
+}
+
+async function hydrateAdminSession(session) {
+  if (!session || session.kind !== 'admin') {
+    return null;
+  }
+
+  const normalizedRole = normalizeInternalRole(session.role);
+  const supabase = await createClient();
+  let lookupQuery = supabase
+    .from('internal_users')
+    .select('id, username, full_name, role, is_active');
+
+  if (session.userId && !String(session.userId).startsWith('legacy-')) {
+    lookupQuery = lookupQuery.eq('id', session.userId);
+  } else if (session.username) {
+    lookupQuery = lookupQuery.ilike('username', session.username).limit(1);
+  } else {
+    return {
+      ...session,
+      role: normalizedRole,
+      assignedClientIds: [],
+    };
+  }
+
+  const { data: internalUser, error } = await lookupQuery.maybeSingle();
+
+  if (error || !internalUser || internalUser.is_active === false) {
+    if (session.userId && !String(session.userId).startsWith('legacy-')) {
+      await clearSessionCookie(ADMIN_COOKIE);
+      return null;
+    }
+
+    return {
+      ...session,
+      role: normalizedRole,
+      assignedClientIds: [],
+    };
+  }
+
+  let assignedClientIds = [];
+  const hydratedRole = normalizeInternalRole(internalUser.role);
+
+  if (hydratedRole === 'employee' || hydratedRole === 'operator') {
+    const { data: assignments, error: assignmentsError } = await supabase
+      .from('internal_user_clients')
+      .select('client_id')
+      .eq('user_id', internalUser.id);
+
+    if (assignmentsError) {
+      throw new Error(assignmentsError.message);
+    }
+
+    assignedClientIds = (assignments || []).map((assignment) => assignment.client_id).filter(Boolean);
+  }
+
+  return {
+    ...session,
+    userId: internalUser.id,
+    username: internalUser.username,
+    fullName: internalUser.full_name || internalUser.username,
+    role: hydratedRole,
+    assignedClientIds,
   };
 }
 
@@ -107,7 +172,7 @@ export async function getAdminSession() {
     return null;
   }
 
-  return session;
+  return hydrateAdminSession(session);
 }
 
 export async function requireAdminSession(roles = DEFAULT_ROLES) {
@@ -118,7 +183,7 @@ export async function requireAdminSession(roles = DEFAULT_ROLES) {
   }
 
   if (roles?.length && !roles.includes(session.role)) {
-    redirect('/');
+    redirect(getDefaultInternalRoute(session));
   }
 
   return session;

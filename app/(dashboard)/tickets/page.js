@@ -3,7 +3,7 @@ import TicketsClient from './TicketsClient';
 import { requireAdminSession } from '@/utils/auth/admin';
 
 export default async function TicketsPage() {
-  await requireAdminSession();
+  await requireAdminSession(['admin', 'manager']);
   const supabase = await createClient();
 
   const { data: tickets, error } = await supabase

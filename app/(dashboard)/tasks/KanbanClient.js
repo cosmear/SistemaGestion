@@ -28,6 +28,7 @@ function buildEmptyTaskDraft() {
     priority: 'low',
     deadline: '',
     subtasks: [],
+    assignedUserId: '',
   };
 }
 
@@ -54,6 +55,7 @@ function buildTaskDraft(task) {
     priority: task.priority || 'low',
     deadline: toDateInputValue(task.deadline),
     subtasks: normalizeSubtasks(task.subtasks),
+    assignedUserId: task.assigned_user_id || '',
   };
 }
 
@@ -91,7 +93,15 @@ function getTaskProgress(task) {
   return { total, done };
 }
 
-export default function KanbanClient({ initialColumns, initialTasks, activeBoard, userName, allClients }) {
+export default function KanbanClient({
+  initialColumns,
+  initialTasks,
+  activeBoard,
+  userName,
+  allClients,
+  assignableUsers,
+  canUseTeamBoard,
+}) {
   const router = useRouter();
   const [tasks, setTasks] = useState(initialTasks || []);
   const [modalState, setModalState] = useState(null);
@@ -101,6 +111,7 @@ export default function KanbanClient({ initialColumns, initialTasks, activeBoard
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [boardError, setBoardError] = useState(null);
   const [modalError, setModalError] = useState(null);
+  const userMap = Object.fromEntries((assignableUsers || []).map((user) => [user.id, user]));
 
   const priorityStyles = {
     low: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -254,6 +265,7 @@ export default function KanbanClient({ initialColumns, initialTasks, activeBoard
       priority: taskDraft.priority,
       deadline: taskDraft.deadline || null,
       subtasks: taskDraft.subtasks,
+      assignedUserId: taskDraft.assignedUserId || null,
     };
 
     let response;
@@ -337,17 +349,19 @@ export default function KanbanClient({ initialColumns, initialTasks, activeBoard
                 <User weight={isPersonal ? 'fill' : 'bold'} />
                 Personal ({userName})
               </button>
-              <button
-                onClick={() => switchBoard('team')}
-                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition-all ${
-                  isTeam
-                    ? 'bg-blue-600 text-white shadow-blue-200 ring-2 ring-blue-600 ring-offset-2'
-                    : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                <Users weight={isTeam ? 'fill' : 'bold'} />
-                Equipo compartido
-              </button>
+              {canUseTeamBoard ? (
+                <button
+                  onClick={() => switchBoard('team')}
+                  className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition-all ${
+                    isTeam
+                      ? 'bg-blue-600 text-white shadow-blue-200 ring-2 ring-blue-600 ring-offset-2'
+                      : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <Users weight={isTeam ? 'fill' : 'bold'} />
+                  Equipo compartido
+                </button>
+              ) : null}
 
               <div className="relative">
                 <button
@@ -371,7 +385,7 @@ export default function KanbanClient({ initialColumns, initialTasks, activeBoard
                     <div className="custom-scrollbar max-h-72 overflow-y-auto">
                       {allClients.length === 0 ? (
                         <div className="p-6 text-center text-sm font-medium text-gray-500">
-                          No hay clientes activos
+                          No hay clientes asignados
                         </div>
                       ) : (
                         allClients.map((client) => (
@@ -382,6 +396,7 @@ export default function KanbanClient({ initialColumns, initialTasks, activeBoard
                           >
                             <span className="h-2 w-2 rounded-full bg-emerald-400" />
                             {client.name}
+                            {client.status === 'inactive' ? ' (inactivo)' : ''}
                           </button>
                         ))
                       )}
@@ -422,6 +437,7 @@ export default function KanbanClient({ initialColumns, initialTasks, activeBoard
               {tasks.filter((task) => task.column_id === column.id).map((task) => {
                 const progress = getTaskProgress(task);
                 const deadlineLabel = formatDeadline(task.deadline);
+                const assignedUser = task.assigned_user_id ? userMap[task.assigned_user_id] : null;
 
                 return (
                   <div
@@ -458,6 +474,13 @@ export default function KanbanClient({ initialColumns, initialTasks, activeBoard
                       </span>
 
                       <div className="flex flex-wrap items-center justify-end gap-2">
+                        {assignedUser ? (
+                          <span className="flex items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700 shadow-sm">
+                            <User weight="bold" />
+                            {assignedUser.full_name}
+                          </span>
+                        ) : null}
+
                         {progress.total > 0 && (
                           <span className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-bold shadow-sm ${
                             progress.done === progress.total
@@ -569,6 +592,24 @@ export default function KanbanClient({ initialColumns, initialTasks, activeBoard
                     className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-600 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-500">
+                  Responsable
+                </label>
+                <select
+                  value={taskDraft.assignedUserId}
+                  onChange={(event) => updateDraftField('assignedUserId', event.target.value)}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">Sin asignar</option>
+                  {(assignableUsers || []).map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.full_name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

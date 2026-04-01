@@ -2,19 +2,36 @@ import { createClient } from '@/utils/supabase/server';
 import KanbanClient from './KanbanClient';
 import { requireAdminSession } from '@/utils/auth/admin';
 import { DEFAULT_KANBAN_COLUMNS } from '@/utils/constants';
+import { canAccessBoard, canAccessTeamBoard, isLimitedStaff } from '@/utils/auth/permissions';
+import { getActiveInternalUsers } from '@/utils/internal-users';
 
 export default async function TasksPage(props) {
   const session = await requireAdminSession();
   const searchParams = await props.searchParams;
   const userName = session.username || 'Admin';
-  const targetBoard = searchParams?.board ? String(searchParams.board) : `personal_${userName}`;
+  const personalBoard = `personal_${userName}`;
+  const requestedBoard = searchParams?.board ? String(searchParams.board) : personalBoard;
+  const targetBoard = canAccessBoard(session, requestedBoard) ? requestedBoard : personalBoard;
   const supabase = await createClient();
 
-  const { data: clients } = await supabase
-    .from('clients')
-    .select('id, name')
-    .eq('status', 'active')
-    .order('name');
+  const clientsQuery = isLimitedStaff(session)
+    ? session.assignedClientIds?.length
+      ? supabase.from('clients').select('id, name, status').in('id', session.assignedClientIds).order('name')
+      : Promise.resolve({ data: [], error: null })
+    : supabase.from('clients').select('id, name, status').order('name');
+
+  const [clientsResult, assignableUsers] = await Promise.all([
+    clientsQuery,
+    getActiveInternalUsers(supabase),
+  ]);
+
+  if (clientsResult.error) {
+    return (
+      <div className="p-8 text-center text-red-500 font-medium">
+        Error cargando los clientes para el tablero.
+      </div>
+    );
+  }
 
   let { data: columns, error: colError } = await supabase
     .from('kanban_columns')
@@ -66,7 +83,7 @@ export default async function TasksPage(props) {
         ? task.subtasks.map((subtask) => `${subtask.text || ''}:${subtask.done ? 1 : 0}`).join('|')
         : ''
 
-      return `${task.id}:${task.column_id}:${task.title || ''}:${task.priority || ''}:${task.deadline || ''}:${checklistStamp}`
+      return `${task.id}:${task.column_id}:${task.title || ''}:${task.priority || ''}:${task.deadline || ''}:${task.assigned_user_id || ''}:${checklistStamp}`
     }),
   });
 
@@ -77,7 +94,9 @@ export default async function TasksPage(props) {
       initialTasks={tasks}
       activeBoard={targetBoard}
       userName={userName}
-      allClients={clients || []}
+      allClients={clientsResult.data || []}
+      assignableUsers={assignableUsers}
+      canUseTeamBoard={canAccessTeamBoard(session)}
     />
   );
 }

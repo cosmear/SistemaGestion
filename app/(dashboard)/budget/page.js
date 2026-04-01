@@ -3,7 +3,7 @@ import BudgetClient from './BudgetClient';
 import { requireAdminSession } from '@/utils/auth/admin';
 
 export default async function BudgetPage() {
-  await requireAdminSession();
+  await requireAdminSession(['admin', 'manager']);
   const supabase = await createClient();
 
   const { data: items, error } = await supabase

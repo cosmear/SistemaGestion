@@ -1,6 +1,8 @@
 import { createClient } from '@/utils/supabase/server';
 import DashboardClient from './DashboardClient';
 import { requireAdminSession } from '@/utils/auth/admin';
+import { canAccessSection, getDefaultInternalRoute } from '@/utils/auth/permissions';
+import { redirect } from 'next/navigation';
 
 const URGENT_CLASSIFICATIONS = new Set(['Urgente', 'Bug']);
 
@@ -146,6 +148,11 @@ function buildTaskAnalytics(tasks, now) {
 
 export default async function DashboardPage() {
   const session = await requireAdminSession();
+
+  if (!canAccessSection(session, 'dashboard')) {
+    redirect(getDefaultInternalRoute(session));
+  }
+
   const supabase = await createClient();
   const boardOwner = session.username || 'Admin';
   const displayName = session.fullName || boardOwner;

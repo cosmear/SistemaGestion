@@ -3,7 +3,7 @@ import CashflowClient from './CashflowClient';
 import { requireAdminSession } from '@/utils/auth/admin';
 
 export default async function CashflowPage() {
-  await requireAdminSession();
+  await requireAdminSession(['admin', 'manager']);
   const supabase = await createClient();
 
   const { data: transactions, error } = await supabase

@@ -19,12 +19,16 @@ export default function Header({ userName, userRole }) {
         return 'Gestion de Tareas';
       case '/calendar':
         return 'Calendario';
+      case '/notes':
+        return 'Notas';
       case '/tickets':
         return 'Tickets y Soporte';
       case '/billing':
         return 'Facturacion y Cobranzas';
       case '/audit':
         return 'Historial de Auditoria';
+      case '/users':
+        return 'Usuarios Internos';
       default:
         return 'Sistema de Gestion';
     }

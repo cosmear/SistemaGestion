@@ -1,16 +1,45 @@
 import { createClient } from '@/utils/supabase/server';
 import ClientList from './ClientList';
 import { requireAdminSession } from '@/utils/auth/admin';
+import { canManageClients, canViewClientPricing, isLimitedStaff } from '@/utils/auth/permissions';
 
 export default async function ClientsPage() {
-  await requireAdminSession();
+  const session = await requireAdminSession();
   const supabase = await createClient();
+  const limitedStaff = isLimitedStaff(session);
+  const visibleClientIds = limitedStaff ? session.assignedClientIds || [] : null;
+  const showFinancials = canViewClientPricing(session);
+  const manageClients = canManageClients(session);
+
+  const clientsQuery = limitedStaff
+    ? visibleClientIds.length
+      ? supabase.from('clients').select('*').in('id', visibleClientIds).order('created_at', { ascending: false })
+      : Promise.resolve({ data: [], error: null })
+    : supabase.from('clients').select('*').order('created_at', { ascending: false });
+
+  const credentialsQuery = manageClients
+    ? supabase.from('client_users').select('id, client_id, email, is_active')
+    : Promise.resolve({ data: [], error: null });
+
+  const ticketsQuery = limitedStaff
+    ? visibleClientIds.length
+      ? supabase.from('tickets').select('id, client_id, status').in('client_id', visibleClientIds)
+      : Promise.resolve({ data: [], error: null })
+    : supabase.from('tickets').select('id, client_id, status');
+
+  const invoicesQuery = showFinancials
+    ? limitedStaff
+      ? visibleClientIds.length
+        ? supabase.from('invoices').select('id, client_id, status, amount').in('client_id', visibleClientIds)
+        : Promise.resolve({ data: [], error: null })
+      : supabase.from('invoices').select('id, client_id, status, amount')
+    : Promise.resolve({ data: [], error: null });
 
   const [clientsResult, credentialsResult, ticketsResult, invoicesResult] = await Promise.all([
-    supabase.from('clients').select('*').order('created_at', { ascending: false }),
-    supabase.from('client_users').select('id, client_id, email, is_active'),
-    supabase.from('tickets').select('id, client_id, status'),
-    supabase.from('invoices').select('id, client_id, status, amount'),
+    clientsQuery,
+    credentialsQuery,
+    ticketsQuery,
+    invoicesQuery,
   ]);
 
   if (clientsResult.error) {
@@ -35,6 +64,8 @@ export default async function ClientsPage() {
       clientCredentials={credentialsResult.data || []}
       clientTickets={ticketsResult.data || []}
       clientInvoices={invoicesResult.data || []}
+      canManageClients={manageClients}
+      canViewFinancials={showFinancials}
     />
   );
 }
