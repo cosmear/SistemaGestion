@@ -1,23 +1,108 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { CalendarBlank, Plus, User, Users, X } from '@phosphor-icons/react';
+import {
+  ArrowsClockwise,
+  CalendarBlank,
+  CheckCircle,
+  GoogleLogo,
+  Plus,
+  TrashSimple,
+  User,
+  Users,
+  WarningCircle,
+  X,
+} from '@phosphor-icons/react';
 import { addCalendarEvent, deleteCalendarEvent } from '@/app/actions';
+import {
+  disconnectGoogleCalendarAccount,
+  refreshGoogleCalendarAccountSources,
+  setGoogleCalendarSourceEnabled,
+} from '@/app/google-calendar-actions';
 import { runServerAction } from '@/utils/client/runServerAction';
 
-export default function CalendarClient({ events, internalUsers, currentUserId }) {
+const GOOGLE_STATUS_MESSAGES = {
+  connected: {
+    classes: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    icon: CheckCircle,
+    title: 'Google Calendar conectado',
+    message: 'La cuenta quedo vinculada y ya puede aportar eventos a la agenda.',
+  },
+  error: {
+    classes: 'border-rose-200 bg-rose-50 text-rose-800',
+    icon: WarningCircle,
+    title: 'No se pudo completar la conexion',
+    message: 'Google devolvio un error al terminar el OAuth. Reintenta la vinculacion.',
+  },
+  'auth-error': {
+    classes: 'border-rose-200 bg-rose-50 text-rose-800',
+    icon: WarningCircle,
+    title: 'Sesion expirada',
+    message: 'Vuelve a iniciar sesion antes de conectar una cuenta de Google.',
+  },
+  'state-error': {
+    classes: 'border-amber-200 bg-amber-50 text-amber-800',
+    icon: WarningCircle,
+    title: 'Vinculacion invalida',
+    message: 'La conexion con Google vencio o no coincide con esta sesion. Intenta otra vez.',
+  },
+  'missing-config': {
+    classes: 'border-amber-200 bg-amber-50 text-amber-800',
+    icon: WarningCircle,
+    title: 'Falta configurar Google Calendar',
+    message:
+      'Crea GOOGLE_CALENDAR_CLIENT_ID, GOOGLE_CALENDAR_CLIENT_SECRET y GOOGLE_CALENDAR_TOKEN_SECRET para habilitar esta integracion.',
+  },
+  'legacy-user': {
+    classes: 'border-amber-200 bg-amber-50 text-amber-800',
+    icon: WarningCircle,
+    title: 'Usuario no compatible',
+    message:
+      'Solo los usuarios internos guardados en la tabla de personal pueden conectar cuentas de Google.',
+  },
+};
+
+export default function CalendarClient({
+  internalUsers,
+  currentUserId,
+  googleCalendarEnabled,
+  googleConnectionAllowed,
+  googleConnections,
+  googleStatus,
+}) {
+  const router = useRouter();
+  const calendarRef = useRef(null);
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [visibility, setVisibility] = useState('personal');
+  const [pendingKey, setPendingKey] = useState(null);
+  const [calendarError, setCalendarError] = useState('');
+  const [isCalendarLoading, setIsCalendarLoading] = useState(false);
+  const [sourceSelectionOverrides, setSourceSelectionOverrides] = useState({});
+  const [isRefreshingUI, startTransition] = useTransition();
   const userMap = useMemo(
     () => Object.fromEntries((internalUsers || []).map((user) => [user.id, user])),
     [internalUsers]
   );
   const shareableUsers = (internalUsers || []).filter((user) => user.id !== currentUserId);
+  const googleStatusConfig = googleStatus ? GOOGLE_STATUS_MESSAGES[googleStatus] : null;
+  const GoogleStatusIcon = googleStatusConfig?.icon || null;
+
+  const refetchCalendar = () => {
+    calendarRef.current?.getApi()?.refetchEvents();
+  };
+
+  const syncCalendarUi = () => {
+    refetchCalendar();
+    startTransition(() => {
+      router.refresh();
+    });
+  };
 
   const resetModal = () => {
     setShowModal(false);
@@ -25,9 +110,43 @@ export default function CalendarClient({ events, internalUsers, currentUserId })
     setIsSubmitting(false);
   };
 
+  const getSourceSelection = (source) => {
+    if (Object.prototype.hasOwnProperty.call(sourceSelectionOverrides, source.id)) {
+      return sourceSelectionOverrides[source.id];
+    }
+
+    return source.isSelected !== false;
+  };
+
+  const handleConnectGoogle = () => {
+    window.location.assign('/api/google-calendar/connect');
+  };
+
   const handleEventClick = async (info) => {
     const isTask = info.event.extendedProps.isTask;
     const isEvent = info.event.extendedProps.isEvent;
+    const isGoogleEvent = info.event.extendedProps.isGoogleEvent;
+
+    if (isGoogleEvent) {
+      const accountEmail = info.event.extendedProps.googleAccountEmail;
+      const calendarName = info.event.extendedProps.googleCalendarSummary;
+      const summary = `${info.event.title}\nCuenta: ${accountEmail}\nCalendario: ${calendarName}`;
+
+      if (info.event.extendedProps.googleHtmlLink) {
+        const shouldOpen = window.confirm(
+          `Evento sincronizado desde Google\n\n${summary}\n\nQuieres abrirlo en Google Calendar?`
+        );
+
+        if (shouldOpen) {
+          window.open(info.event.extendedProps.googleHtmlLink, '_blank', 'noopener,noreferrer');
+        }
+
+        return;
+      }
+
+      alert(`Evento sincronizado desde Google\n\n${summary}`);
+      return;
+    }
 
     if (isTask) {
       const assignedUser = info.event.extendedProps.assignedUserId
@@ -72,7 +191,10 @@ export default function CalendarClient({ events, internalUsers, currentUserId })
 
       if (!result.success) {
         alert(result.error || 'No se pudo eliminar el evento.');
+        return;
       }
+
+      refetchCalendar();
     }
   };
 
@@ -101,6 +223,102 @@ export default function CalendarClient({ events, internalUsers, currentUserId })
     }
 
     resetModal();
+    refetchCalendar();
+  };
+
+  const handleRefreshGoogleAccount = async (accountId) => {
+    setPendingKey(`account-refresh:${accountId}`);
+
+    try {
+      const result = await runServerAction(refreshGoogleCalendarAccountSources, accountId);
+
+      if (!result.success) {
+        alert(result.error || 'No se pudo refrescar la cuenta de Google.');
+        return;
+      }
+
+      syncCalendarUi();
+    } finally {
+      setPendingKey(null);
+    }
+  };
+
+  const handleDisconnectGoogleAccount = async (accountId, accountEmail) => {
+    const confirmed = window.confirm(
+      `Vas a desconectar ${accountEmail}.\n\nLos eventos dejaran de verse en este calendario.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setPendingKey(`account-disconnect:${accountId}`);
+
+    try {
+      const result = await runServerAction(disconnectGoogleCalendarAccount, accountId);
+
+      if (!result.success) {
+        alert(result.error || 'No se pudo desconectar la cuenta de Google.');
+        return;
+      }
+
+      syncCalendarUi();
+    } finally {
+      setPendingKey(null);
+    }
+  };
+
+  const handleToggleGoogleSource = async (sourceId, nextValue) => {
+    setPendingKey(`source:${sourceId}`);
+    setSourceSelectionOverrides((current) => ({
+      ...current,
+      [sourceId]: nextValue,
+    }));
+
+    try {
+      const result = await runServerAction(setGoogleCalendarSourceEnabled, sourceId, nextValue);
+
+      if (!result.success) {
+        setSourceSelectionOverrides((current) => ({
+          ...current,
+          [sourceId]: !nextValue,
+        }));
+        alert(result.error || 'No se pudo actualizar ese calendario externo.');
+        return;
+      }
+
+      syncCalendarUi();
+    } finally {
+      setPendingKey(null);
+    }
+  };
+
+  const loadEvents = async (fetchInfo, successCallback, failureCallback) => {
+    try {
+      setCalendarError('');
+
+      const query = new URLSearchParams({
+        start: fetchInfo.startStr,
+        end: fetchInfo.endStr,
+      });
+
+      const response = await fetch(`/api/calendar/feed?${query.toString()}`, {
+        cache: 'no-store',
+      });
+
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(payload?.error || 'No se pudo cargar la agenda corporativa.');
+      }
+
+      successCallback(payload?.events || []);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'No se pudo cargar la agenda corporativa.';
+      setCalendarError(message);
+      failureCallback(error);
+    }
   };
 
   return (
@@ -111,19 +329,193 @@ export default function CalendarClient({ events, internalUsers, currentUserId })
             <CalendarBlank className="text-brand-600" weight="fill" /> Agenda corporativa
           </h3>
           <p className="text-sm font-medium text-gray-500">
-            Cruza vencimientos de tareas con eventos globales, personales o compartidos por @personas.
+            Cruza tareas internas con eventos propios, compartidos y ahora tambien con Google
+            Calendar.
           </p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-brand-200 transition-all hover:-translate-y-0.5 hover:bg-brand-700"
+        <div className="flex flex-wrap items-center gap-3">
+          {googleConnectionAllowed ? (
+            <button
+              type="button"
+              onClick={handleConnectGoogle}
+              className="flex items-center gap-2 rounded-xl border border-brand-200 bg-white px-4 py-2.5 text-sm font-bold text-brand-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-300 hover:bg-brand-50"
+            >
+              <GoogleLogo weight="fill" className="text-lg" /> Conectar Google
+            </button>
+          ) : null}
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-brand-200 transition-all hover:-translate-y-0.5 hover:bg-brand-700"
+          >
+            <Plus weight="bold" className="text-lg" /> Nuevo evento
+          </button>
+        </div>
+      </div>
+
+      {googleStatusConfig ? (
+        <div
+          className={`mb-4 flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm font-medium ${googleStatusConfig.classes}`}
         >
-          <Plus weight="bold" className="text-lg" /> Nuevo evento
-        </button>
+          {GoogleStatusIcon ? (
+            <GoogleStatusIcon className="mt-0.5 shrink-0 text-lg" weight="fill" />
+          ) : null}
+          <div>
+            <p className="font-black">{googleStatusConfig.title}</p>
+            <p>{googleStatusConfig.message}</p>
+          </div>
+        </div>
+      ) : null}
+
+      {calendarError ? (
+        <div className="mb-4 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
+          <WarningCircle className="mt-0.5 shrink-0 text-lg" weight="fill" />
+          <div>
+            <p className="font-black">No se pudo refrescar la agenda</p>
+            <p>{calendarError}</p>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mb-6 shrink-0 rounded-3xl border border-gray-100 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:p-6">
+        <div className="flex flex-col gap-3 border-b border-gray-100 pb-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h4 className="flex items-center gap-2 text-lg font-black text-gray-900">
+              <GoogleLogo weight="fill" className="text-brand-600" /> Google Calendar
+            </h4>
+            <p className="text-sm font-medium text-gray-500">
+              Puedes conectar varias cuentas y decidir que calendarios externos entran en la agenda.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
+            {isCalendarLoading ? 'Sincronizando agenda...' : 'Feed dinamico por rango'}
+          </div>
+        </div>
+
+        {!googleCalendarEnabled ? (
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+            Configura `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET` y
+            `GOOGLE_CALENDAR_TOKEN_SECRET` para habilitar esta integracion.
+          </div>
+        ) : !googleConnectionAllowed ? (
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+            Esta sesion es legacy. Para conectar Google Calendar, entra con un usuario que exista en
+            `internal_users`.
+          </div>
+        ) : googleConnections.length === 0 ? (
+          <div className="mt-4 rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-5 py-6 text-sm font-medium text-gray-500">
+            Aun no hay cuentas conectadas. Vincula una cuenta de Google para empezar a traer sus
+            eventos.
+          </div>
+        ) : (
+          <div className="mt-4 space-y-4">
+            {googleConnections.map((account) => {
+              const selectedSources = account.sources.filter((source) => getSourceSelection(source));
+              const isRefreshingAccount = pendingKey === `account-refresh:${account.id}`;
+              const isDisconnectingAccount = pendingKey === `account-disconnect:${account.id}`;
+
+              return (
+                <div
+                  key={account.id}
+                  className="rounded-3xl border border-gray-100 bg-gray-50/60 p-4"
+                >
+                  <div className="flex flex-col gap-4 border-b border-gray-200 pb-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <p className="text-sm font-black text-gray-900">
+                        {account.displayName || account.email}
+                      </p>
+                      <p className="text-sm font-medium text-gray-500">{account.email}</p>
+                      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                        {selectedSources.length} calendarios visibles de {account.sources.length}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleRefreshGoogleAccount(account.id)}
+                        disabled={isRefreshingAccount || isRefreshingUI}
+                        className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 transition-colors hover:border-brand-300 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <ArrowsClockwise
+                          className={isRefreshingAccount ? 'animate-spin text-base' : 'text-base'}
+                          weight="bold"
+                        />
+                        Actualizar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDisconnectGoogleAccount(account.id, account.email)}
+                        disabled={isDisconnectingAccount || isRefreshingUI}
+                        className="flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-4 py-2 text-sm font-bold text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <TrashSimple className="text-base" weight="bold" />
+                        Desconectar
+                      </button>
+                    </div>
+                  </div>
+
+                  {account.sources.length === 0 ? (
+                    <p className="mt-4 text-sm font-medium text-gray-500">
+                      Esta cuenta ya quedo conectada, pero todavia no devolvio calendarios.
+                    </p>
+                  ) : (
+                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {account.sources.map((source) => {
+                        const isSelected = getSourceSelection(source);
+                        const isSourcePending = pendingKey === `source:${source.id}`;
+
+                        return (
+                          <button
+                            key={source.id}
+                            type="button"
+                            onClick={() => handleToggleGoogleSource(source.id, !isSelected)}
+                            disabled={isSourcePending || isRefreshingUI}
+                            className={`rounded-2xl border px-4 py-3 text-left shadow-sm transition-all ${
+                              isSelected
+                                ? 'border-brand-200 bg-white ring-2 ring-brand-100'
+                                : 'border-gray-200 bg-white/60 hover:border-gray-300'
+                            } disabled:cursor-not-allowed disabled:opacity-60`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className="h-3 w-3 rounded-full"
+                                    style={{ backgroundColor: source.backgroundColor || '#4285F4' }}
+                                  />
+                                  <p className="truncate text-sm font-black text-gray-900">
+                                    {source.summary}
+                                  </p>
+                                </div>
+                                <p className="mt-1 text-xs font-medium text-gray-500">
+                                  {source.primaryCalendar ? 'Principal' : 'Secundario'} ·{' '}
+                                  {source.accessRole}
+                                </p>
+                              </div>
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
+                                  isSelected
+                                    ? 'bg-brand-100 text-brand-700'
+                                    : 'bg-gray-100 text-gray-500'
+                                }`}
+                              >
+                                {isSelected ? 'Visible' : 'Oculto'}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col overflow-hidden rounded-3xl border border-gray-100 bg-white p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:p-8">
-        <div className="mb-4 flex flex-wrap gap-4 border-b border-gray-100 pb-4 shrink-0">
+        <div className="mb-4 flex shrink-0 flex-wrap gap-4 border-b border-gray-100 pb-4">
           <span className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
             <span className="h-3 w-3 rounded-full bg-[#8B5CF6]" /> Tarea personal
           </span>
@@ -134,15 +526,19 @@ export default function CalendarClient({ events, internalUsers, currentUserId })
             <span className="h-3 w-3 rounded-full bg-[#10B981]" /> Tareas cliente
           </span>
           <span className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
-            <span className="h-3 w-3 rounded-full bg-[#F97316]" /> Evento global
+            <span className="h-3 w-3 rounded-full bg-[#F97316]" /> Evento interno
           </span>
           <span className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
             <span className="h-3 w-3 rounded-full bg-[#EC4899]" /> Evento personal o compartido
+          </span>
+          <span className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
+            <span className="h-3 w-3 rounded-full bg-[#4285F4]" /> Evento de Google Calendar
           </span>
         </div>
 
         <div className="custom-scrollbar relative min-h-0 flex-1 w-full overflow-hidden">
           <FullCalendar
+            ref={calendarRef}
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
             initialView="dayGridMonth"
             headerToolbar={{
@@ -150,8 +546,9 @@ export default function CalendarClient({ events, internalUsers, currentUserId })
               center: 'title',
               right: 'dayGridMonth,timeGridWeek',
             }}
-            events={events}
+            events={loadEvents}
             eventClick={handleEventClick}
+            loading={setIsCalendarLoading}
             height="100%"
             locale="es"
             dayMaxEvents
@@ -240,7 +637,7 @@ export default function CalendarClient({ events, internalUsers, currentUserId })
                   <select
                     name="visibility"
                     value={visibility}
-                    onChange={(event) => setVisibility(event.target.value)}
+                    onChange={(changeEvent) => setVisibility(changeEvent.target.value)}
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-bold text-gray-700 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
                   >
                     <option value="personal">Personal</option>
@@ -259,11 +656,14 @@ export default function CalendarClient({ events, internalUsers, currentUserId })
                   <p className="text-sm font-black text-gray-900">Arrobar personas</p>
                 </div>
                 <p className="mt-1 text-sm font-medium text-gray-500">
-                  Aunque el evento sea personal, las personas seleccionadas tambien lo veran en su calendario.
+                  Aunque el evento sea personal, las personas seleccionadas tambien lo veran en su
+                  calendario.
                 </p>
 
                 {shareableUsers.length === 0 ? (
-                  <p className="mt-4 text-sm font-medium text-gray-500">No hay otros usuarios internos activos.</p>
+                  <p className="mt-4 text-sm font-medium text-gray-500">
+                    No hay otros usuarios internos activos.
+                  </p>
                 ) : (
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     {shareableUsers.map((user) => (
