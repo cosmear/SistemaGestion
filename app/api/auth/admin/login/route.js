@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authenticateAdminUser, createAdminSession } from '@/utils/auth/admin';
+import { buildRedirectUrl } from '@/utils/http/redirect';
 
 export async function POST(request) {
   const formData = await request.formData();
@@ -8,14 +9,14 @@ export async function POST(request) {
   const user = await authenticateAdminUser(username, password);
 
   if (!user) {
-    return NextResponse.redirect(new URL('/login?error=invalid', request.url), {
+    return NextResponse.redirect(buildRedirectUrl(request, '/login?error=invalid'), {
       status: 303,
     });
   }
 
   await createAdminSession(user);
 
-  return NextResponse.redirect(new URL('/', request.url), {
+  return NextResponse.redirect(buildRedirectUrl(request, '/'), {
     status: 303,
   });
 }

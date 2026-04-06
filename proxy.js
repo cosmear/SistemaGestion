@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifySessionToken } from '@/utils/auth/token';
+import { buildRedirectUrl } from '@/utils/http/redirect';
 
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
@@ -19,14 +20,14 @@ export async function proxy(request) {
 
   if (pathname.startsWith('/portal')) {
     if (!clientSession || clientSession.kind !== 'client') {
-      return NextResponse.redirect(new URL('/portal-login', request.url));
+      return NextResponse.redirect(buildRedirectUrl(request, '/portal-login'));
     }
 
     return NextResponse.next();
   }
 
   if (!adminSession || adminSession.kind !== 'admin') {
-    return NextResponse.redirect(new URL('/login', request.url));
+    return NextResponse.redirect(buildRedirectUrl(request, '/login'));
   }
 
   return NextResponse.next();
